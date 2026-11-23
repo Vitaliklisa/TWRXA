@@ -1,0 +1,284 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import 'core/firebase_action_code.dart';
+import 'core/models.dart';
+import 'core/routes.dart';
+import 'providers/app_providers.dart';
+import 'screens/blocked_people_screen.dart';
+import 'screens/circles_screen.dart';
+import 'screens/delete_account_screen.dart';
+import 'screens/event_detail_screen.dart';
+import 'screens/event_editor_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/invitations_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/notifications_screen.dart';
+import 'screens/password_reset_screen.dart';
+import 'screens/policy_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/support_screen.dart';
+import 'screens/verify_email_screen.dart';
+import 'widgets/app_navigation_shell.dart';
+
+/// Route names, kept in one place so navigation calls never use raw strings.
+///
+/// Defined in `core/routes.dart` and re-exported here, so screens that already
+/// import this file keep working while the definition stays importable by a
+/// screen without creating a cycle.
+export 'core/routes.dart';
+
+/// The app's root navigator key.
+///
+/// Public so a surface that dismisses itself (a modal bottom sheet) can show a
+/// snackbar on the ROOT `ScaffoldMessenger` after its own route is gone. Using
+/// the sheet's own context for that shows the message on a messenger that dies
+/// with the route, which silently drops it.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+final _rootKey = rootNavigatorKey;
+
+/// Routes that do not require a signed-in user.
+///
+/// Password resets, action-code handling, policies, and support remain
+/// reachable while signed out. Login is handled by the redirect below so an
+/// already-signed-in user can be sent to their destination or email gate.
+bool _isPublic(String location) {
+  if (location == Routes.passwordReset ||
+      location == Routes.firebaseAuthAction ||
+      location == Routes.privacy ||
+      location == Routes.terms) {
+    return true;
+  }
+  return location == Routes.support ||
+      location.startsWith('${Routes.support}/');
+}
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final router = GoRouter(
+    navigatorKey: _rootKey,
+    initialLocation: Routes.home,
+    redirect: (context, state) {
+      if (state.matchedLocation == Routes.verifyEmail &&
+          findFirebaseActionCode(state.uri) != null) {
+        return null;
+      }
+
+      final auth = ref.read(activeAuthStateProvider);
+      final goingToLogin = state.matchedLocation == Routes.login;
+      final goingToEmailVerification =
+          state.matchedLocation == Routes.verifyEmail;
+
+      // Support must stay reachable when signed out. Somebody who cannot get
+      // into their account — or a store reviewer checking that the support URL
+      // in the listing resolves — has to be able to reach us without a working
+      // session.
+      //
+      // Matched as a prefix, not with `==`, so `/support` and any path under it
+      // (a trailing slash, a future `/support/faq`, a deep link) all stay public.
+      // An exact match here would silently send `/support/` to the login screen,
+      // which is exactly the dead end this exemption exists to prevent.
+      if (_isPublic(state.matchedLocation)) return null;
+
+      if (auth.isLoading) {
+        return goingToLogin ? null : _loginLocation(state.uri);
+      }
+
+      final user = auth.value;
+      final signedIn = user != null && !user.isAnonymous;
+      final needsEmailVerification =
+          signedIn && !user.emailVerified && !user.isGoogleUser;
+
+      if (goingToEmailVerification) {
+        if (!signedIn) return _loginLocation(state.uri);
+        return needsEmailVerification ? null : Routes.home;
+      }
+      if (!signedIn && !goingToLogin) return _loginLocation(state.uri);
+      if (needsEmailVerification) return Routes.verifyEmail;
+      if (signedIn && goingToLogin) {
+        final destination = state.uri.queryParameters['from'];
+        if (destination != null &&
+            destination.startsWith('/') &&
+            !destination.startsWith('//') &&
+            destination != Routes.login) {
+          return destination;
+        }
+        return Routes.home;
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: Routes.login,
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: Routes.verifyEmail,
+        name: 'verifyEmail',
+        builder: (context, state) => VerifyEmailScreen(actionUri: state.uri),
+      ),
+      GoRoute(
+        path: Routes.passwordReset,
+        name: 'passwordReset',
+        builder: (context, state) => PasswordResetScreen(actionUri: state.uri),
+      ),
+      GoRoute(
+        path: Routes.firebaseAuthAction,
+        name: 'firebaseAuthAction',
+        builder: (context, state) {
+          if (state.uri.queryParameters['mode'] == 'verifyEmail') {
+            return VerifyEmailScreen(actionUri: state.uri);
+          }
+          return PasswordResetScreen(actionUri: state.uri);
+        },
+      ),
+      ShellRoute(
+        builder: (context, state, child) => AppNavigationShell(
+          location: state.uri.path,
+          child: child,
+        ),
+        routes: [
+          GoRoute(
+            path: Routes.home,
+            name: 'home',
+            builder: (context, state) => const HomeScreen(),
+            routes: [
+              // `/home/:id` pins one countdown as the hero.
+              //
+              // **The `home/` prefix is required, not cosmetic.** `Routes.home`
+              // is `/`, so a bare `:id` child makes the home route match
+              // `/anything` — GoRouter matches `/` then lets `:id` swallow the
+              // next segment. That silently captured `/support` and rendered the
+              // home screen at the support URL, while the sidebar (which reads
+              // the URL string, not the matched route) highlighted Support. Two
+              // sources of truth disagreeing: the highlight said Support, the
+              // body said Home.
+              //
+              // An explicit `home/:id` segment cannot collide with a sibling
+              // top-level route, because `/support` no longer matches `/` +
+              // `:id`.
+              //
+              // Additive on purpose: `/` still works and still picks the
+              // countdown automatically, so existing links do not break.
+              GoRoute(
+                path: 'home/:id',
+                name: 'homeEvent',
+                builder: (context, state) => HomeScreen(
+                  focusedEventId: state.pathParameters['id'],
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: Routes.settings,
+            name: 'settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: Routes.deleteAccount,
+            name: 'deleteAccount',
+            builder: (context, state) => const DeleteAccountScreen(),
+          ),
+          GoRoute(
+            path: Routes.invitations,
+            name: 'invitations',
+            builder: (context, state) => const InvitationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.circles,
+            name: 'circles',
+            builder: (context, state) => const CirclesScreen(),
+          ),
+          GoRoute(
+            path: Routes.notifications,
+            name: 'notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.blocked,
+            name: 'blocked',
+            builder: (context, state) => const BlockedPeopleScreen(),
+          ),
+          // Support sits inside the shell like every other page, so it gets the
+          // same navigation: the sidebar on desktop, and a route the bottom bar
+          // and Settings can both reach. Earlier it was a standalone top-level
+          // route, which made it the one page in the app with different chrome.
+          //
+          // The public exemption in the redirect is what keeps it reachable
+          // signed out — position in this tree has nothing to do with access.
+          GoRoute(
+            path: Routes.support,
+            name: 'support',
+            builder: (context, state) => const SupportScreen(),
+          ),
+          // The legal pages keep real, shareable URLs, and a cold load of one
+          // lands straight on the document. The tap path from Settings/Support
+          // does **not** `push` these routes: inside this shell a push of a
+          // sibling route is silently swallowed (the URL and the screen both
+          // stay put). `openLegalPage` records the document and moves the URL
+          // with `go` instead — see `lib/core/routes.dart`.
+          GoRoute(
+            path: Routes.privacy,
+            name: 'privacy',
+            builder: (context, state) => const PolicyScreen(isPrivacy: true),
+          ),
+          GoRoute(
+            path: Routes.terms,
+            name: 'terms',
+            builder: (context, state) => const PolicyScreen(isPrivacy: false),
+          ),
+          GoRoute(
+            path: Routes.newEvent,
+            name: 'newEvent',
+            builder: (context, state) => EventEditorScreen(
+              event: state.extra is CountdownEvent
+                  ? state.extra as CountdownEvent
+                  : null,
+            ),
+          ),
+          // Keep the edit route before the detail route so `/event/:id/edit`
+          // cannot be mistaken for an event whose id is `:id/edit`.
+          GoRoute(
+            path: '${Routes.eventDetail}/:id/edit',
+            name: 'editEvent',
+            builder: (context, state) => EventEditorScreen(
+              event: state.extra is CountdownEvent
+                  ? state.extra as CountdownEvent
+                  : null,
+            ),
+          ),
+          GoRoute(
+            path: '${Routes.eventDetail}/:id',
+            name: 'eventDetail',
+            builder: (context, state) => EventDetailScreen(
+              eventId: state.pathParameters['id']!,
+              startInEditMode: state.uri.queryParameters['edit'] == '1',
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  ref.listen(activeAuthStateProvider, (_, __) => router.refresh());
+
+  // Keep the open legal document in step with the URL both ways: a back
+  // gesture, a deep link, or a fresh load of `/privacy` all arrive as a
+  // location change, not a tap on a link.
+  void syncLegalPage() {
+    final open = ref.read(legalDocumentProvider);
+    final at = legalDocumentAt(router.state.uri.path);
+    if (open != at) ref.read(legalDocumentProvider.notifier).state = at;
+  }
+
+  router.routerDelegate.addListener(syncLegalPage);
+  ref.onDispose(() => router.routerDelegate.removeListener(syncLegalPage));
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+String _loginLocation(Uri destination) => Uri(
+      path: Routes.login,
+      queryParameters: {'from': destination.toString()},
+    ).toString();

@@ -1,0 +1,218 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../core/firebase_action_code.dart';
+import '../core/routes.dart';
+import '../core/theme.dart';
+import '../l10n/app_localizations_context.dart';
+import '../providers/app_providers.dart';
+
+class VerifyEmailScreen extends ConsumerStatefulWidget {
+  const VerifyEmailScreen({this.actionUri, super.key});
+
+  final Uri? actionUri;
+
+  @override
+  ConsumerState<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
+}
+
+class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
+  bool _checking = false;
+  bool _resending = false;
+  bool _cooldownActive = false;
+  bool _applyingAction = false;
+  String? _actionMessage;
+  String? _actionError;
+
+  @override
+  void initState() {
+    super.initState();
+    final uri = widget.actionUri;
+    if (uri != null) {
+      final code = findFirebaseActionCode(uri);
+      if (code != null) {
+        _applyVerificationCode(code);
+      }
+    }
+  }
+
+  Future<void> _applyVerificationCode(String code) async {
+    setState(() => _applyingAction = true);
+    try {
+      final service = ref.read(authServiceProvider);
+      await service.applyEmailVerificationCode(code);
+      final user = await service.reloadCurrentUser();
+      if (!mounted) return;
+      if (user?.emailVerified == true) {
+        context.go(Routes.home);
+      } else {
+        setState(() {
+          _actionMessage = context.l10n.verifiedSignInToContinue;
+        });
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _actionError = error.toString());
+    } finally {
+      if (mounted) setState(() => _applyingAction = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_resending || _cooldownActive) return;
+    setState(() => _resending = true);
+    try {
+      await ref.read(authServiceProvider).sendEmailVerification();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.verificationEmailSent)),
+      );
+      setState(() {
+        _resending = false;
+        _cooldownActive = true;
+      });
+      await Future<void>.delayed(const Duration(seconds: 60));
+      if (mounted) setState(() => _cooldownActive = false);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+      setState(() => _resending = false);
+    }
+  }
+
+  Future<void> _checkVerification() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    try {
+      final user = await ref.read(authServiceProvider).reloadCurrentUser();
+      if (!mounted) return;
+      if (user?.emailVerified == true || user?.isGoogleUser == true) {
+        context.go(Routes.home);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.verificationNotComplete)),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final colors = context.colors;
+    final l10n = context.l10n;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(
+                    Icons.mark_email_unread_outlined,
+                    size: 52,
+                    color: colors.accent,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    l10n.verifyEmailTitle,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.verifyEmailInstructions(
+                      user?.email ?? l10n.yourEmailAddress,
+                    ),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(height: 1.5, color: colors.muted),
+                  ),
+                  if (_applyingAction) ...[
+                    const SizedBox(height: 12),
+                    const Center(child: CircularProgressIndicator()),
+                  ],
+                  if (_actionMessage != null || _actionError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _actionMessage ?? _actionError!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        height: 1.5,
+                        color:
+                            _actionError == null ? colors.accent : colors.muted,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.checkSpamFolder,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      height: 1.5,
+                      color: colors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  FilledButton(
+                    onPressed: _checking ? null : _checkVerification,
+                    child: _checking
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(l10n.confirmEmailVerified),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: _resending || _cooldownActive ? null : _resend,
+                    child: Text(
+                      _resending ? l10n.sendingEmail : l10n.resendEmail,
+                    ),
+                  ),
+                  if (_cooldownActive) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.waitBeforeResending,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: colors.muted),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () async {
+                      final error = await runAction(
+                        context,
+                        () => ref.read(authServiceProvider).signOut(),
+                      );
+                      if (error == null && context.mounted) {
+                        context.go(Routes.login);
+                      }
+                    },
+                    child: Text(l10n.signOut),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
