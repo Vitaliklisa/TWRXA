@@ -9,12 +9,12 @@
 // menu itself — including the cases that must stay refused: changing your own
 // role, granting above your own, and touching the creator.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:datedawn/core/models.dart';
-import 'package:datedawn/core/theme.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/screens/event_editor_screen.dart';
-import 'package:datedawn/services/auth_service.dart';
-import 'package:datedawn/services/event_repository.dart';
+import 'package:twrxa/core/models.dart';
+import 'package:twrxa/core/theme.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/screens/event_editor_screen.dart';
+import 'package:twrxa/services/auth_service.dart';
+import 'package:twrxa/services/event_repository.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

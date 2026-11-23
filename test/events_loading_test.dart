@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/services/auth_service.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/services/auth_service.dart';
 
 void main() {
   test('events stay loading until the auth session is restored', () {

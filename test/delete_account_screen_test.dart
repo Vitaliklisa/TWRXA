@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:datedawn/core/theme.dart';
-import 'package:datedawn/l10n/generated/app_localizations.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/router.dart';
-import 'package:datedawn/screens/delete_account_screen.dart';
-import 'package:datedawn/services/auth_service.dart';
-import 'package:datedawn/services/deletion_service.dart';
+import 'package:twrxa/core/theme.dart';
+import 'package:twrxa/l10n/generated/app_localizations.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/router.dart';
+import 'package:twrxa/screens/delete_account_screen.dart';
+import 'package:twrxa/services/auth_service.dart';
+import 'package:twrxa/services/deletion_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

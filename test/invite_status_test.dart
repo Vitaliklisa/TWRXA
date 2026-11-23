@@ -1,4 +1,4 @@
-import 'package:datedawn/core/models.dart';
+import 'package:twrxa/core/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The invitation states drive both the status chip and the accept/decline

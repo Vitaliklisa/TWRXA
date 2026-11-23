@@ -5,8 +5,8 @@
 // unidentifiable account, and the blocked list round-trips through the model
 // with a label that is never blank.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:datedawn/core/models.dart';
-import 'package:datedawn/services/event_repository.dart';
+import 'package:twrxa/core/models.dart';
+import 'package:twrxa/services/event_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The constructor reaches for `FirebaseFirestore.instance` when none is given,

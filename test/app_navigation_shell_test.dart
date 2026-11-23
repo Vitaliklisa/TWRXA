@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/widgets/app_navigation_shell.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/widgets/app_navigation_shell.dart';
 
 void main() {
   testWidgets('desktop navigation changes to dedicated section routes',

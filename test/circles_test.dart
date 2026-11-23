@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:datedawn/core/circles.dart';
-import 'package:datedawn/core/models.dart';
-import 'package:datedawn/core/recent_contacts.dart';
+import 'package:twrxa/core/circles.dart';
+import 'package:twrxa/core/models.dart';
+import 'package:twrxa/core/recent_contacts.dart';
 
 /// A fixed instant, so no assertion depends on the date the suite runs.
 /// `DateTime` has no const constructor, so this is a plain `final`.

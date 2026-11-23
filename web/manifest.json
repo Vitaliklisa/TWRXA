@@ -1,11 +1,11 @@
 {
-    "name": "Date Dawn — Countdown",
-    "short_name": "Date Dawn",
+    "name": "TWRXA Supply Co.",
+    "short_name": "TWRXA",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0E1113",
-    "theme_color": "#0E1113",
-    "description": "Count down to the moments that matter — years, months, days and hours, then a celebration when the day arrives.",
+    "background_color": "#080B09",
+    "theme_color": "#39FF14",
+    "description": "Everyday uniforms for the ones who take the long way home.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

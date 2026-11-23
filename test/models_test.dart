@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:datedawn/core/models.dart';
+import 'package:twrxa/core/models.dart';
 
 void main() {
   group('ParticipantRole', () {

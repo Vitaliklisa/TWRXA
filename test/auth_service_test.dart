@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:datedawn/services/auth_service.dart';
+import 'package:twrxa/services/auth_service.dart';
 
 class _MockFirebaseAuth extends Mock implements FirebaseAuth {}
 

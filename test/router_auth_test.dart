@@ -1,17 +1,17 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:datedawn/core/models.dart';
-import 'package:datedawn/screens/home_screen.dart';
-import 'package:datedawn/screens/verify_email_screen.dart';
-import 'package:datedawn/services/event_repository.dart';
+import 'package:twrxa/core/models.dart';
+import 'package:twrxa/screens/home_screen.dart';
+import 'package:twrxa/screens/verify_email_screen.dart';
+import 'package:twrxa/services/event_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/router.dart';
-import 'package:datedawn/services/auth_service.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/router.dart';
+import 'package:twrxa/services/auth_service.dart';
 
 class _FakeFirebaseAuth extends Fake implements FirebaseAuth {}
 

@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/services/auth_service.dart';
-import 'package:datedawn/services/event_repository.dart';
-import 'package:datedawn/widgets/invitations_inbox.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/services/auth_service.dart';
+import 'package:twrxa/services/event_repository.dart';
+import 'package:twrxa/widgets/invitations_inbox.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';

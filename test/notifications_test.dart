@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:datedawn/core/notifications.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/services/auth_service.dart';
-import 'package:datedawn/services/notification_service.dart';
+import 'package:twrxa/core/notifications.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/services/auth_service.dart';
+import 'package:twrxa/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

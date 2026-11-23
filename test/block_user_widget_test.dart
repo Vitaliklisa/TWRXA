@@ -1,8 +1,8 @@
-import 'package:datedawn/core/models.dart';
-import 'package:datedawn/providers/app_providers.dart';
-import 'package:datedawn/services/auth_service.dart';
-import 'package:datedawn/services/event_repository.dart';
-import 'package:datedawn/widgets/block_user.dart';
+import 'package:twrxa/core/models.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/services/auth_service.dart';
+import 'package:twrxa/services/event_repository.dart';
+import 'package:twrxa/widgets/block_user.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

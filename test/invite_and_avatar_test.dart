@@ -7,10 +7,10 @@
 //    the avatar fall back to a meaningless one-letter tile.
 // 3. "Couple not working" — accepts must happen once, and the claim has to be
 //    shared between the provider and the inbox card.
-import 'package:datedawn/core/circles.dart';
-import 'package:datedawn/core/models.dart';
-import 'package:datedawn/core/recent_contacts.dart';
-import 'package:datedawn/services/auth_service.dart';
+import 'package:twrxa/core/circles.dart';
+import 'package:twrxa/core/models.dart';
+import 'package:twrxa/core/recent_contacts.dart';
+import 'package:twrxa/services/auth_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

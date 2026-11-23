@@ -1,6 +1,6 @@
 import 'dart:ui' show Locale;
 
-import 'package:datedawn/core/time_format.dart';
+import 'package:twrxa/core/time_format.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,6 +1,6 @@
-import 'package:datedawn/core/theme.dart';
-import 'package:datedawn/l10n/generated/app_localizations.dart';
-import 'package:datedawn/widgets/delete_account_dialog.dart';
+import 'package:twrxa/core/theme.dart';
+import 'package:twrxa/l10n/generated/app_localizations.dart';
+import 'package:twrxa/widgets/delete_account_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

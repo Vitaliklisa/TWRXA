@@ -7,17 +7,17 @@
 # not flash white before the first frame — the single most jarring launch bug on
 # a dark-themed app.
 flutter_native_splash:
-  color: "#0E1113"
+  color: "#080B09"
   image: assets/splash/splash.png
 
   # Android 12+ draws its own splash from a small icon on a flat background.
   android_12:
-    color: "#0E1113"
+    color: "#080B09"
     image: assets/splash/splash.png
-    icon_background_color: "#0E1113"
+    icon_background_color: "#080B09"
 
   # Dark-mode splash: same canvas, so the two are intentionally identical.
-  color_dark: "#0E1113"
+  color_dark: "#080B09"
   image_dark: assets/splash/splash-dark.png
 
   android: true

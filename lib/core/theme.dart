@@ -2,63 +2,61 @@ import 'package:flutter/material.dart';
 
 /// Design tokens for Date Dawn.
 ///
-/// Ported from the web app's Tailwind theme (`src/styles.css`): a near-black
-/// canvas, a warm cream foreground and a single teal accent that carries every
-/// live/active state. Two accents would read as two products, so there is one.
+/// TWRXA's storefront palette: near-black surfaces with acid-green and
+/// ultraviolet-pink accents.
 class AppColors {
   const AppColors._();
+  static const canvas = Color(0xFF080B09);
+  static const canvasAlt = Color(0xFF101612);
+  static const surface = Color(0xFF111613);
+  static const surface2 = Color(0xFF1B241E);
+  static const border = Color(0xFF28312B);
+  static const borderStrong = Color(0xFF39463C);
 
-  static const canvas = Color(0xFF0E1113);
-  static const surface = Color(0xFF161A1D);
-  static const surface2 = Color(0xFF1D2226);
-  static const border = Color(0xFF262C31);
-  static const borderStrong = Color(0xFF39424A);
+  static const fg = Color(0xFFF2F6F2);
+  static const muted = Color(0xFFAAB5AC);
+  static const subtle = Color(0xFF79847C);
 
-  static const fg = Color(0xFFF0F1EE);
-  static const muted = Color(0xFF9BA3AB);
-  static const subtle = Color(0xFF6C757D);
+  static const accent = Color(0xFF39FF14);
+  static const accent2 = Color(0xFFFF2D95);
+  static const accentSoft = Color(0xFF1C361E);
+  static const accentFg = Color(0xFF080B09);
 
-  static const accent = Color(0xFF4FD1C5);
-  static const accentSoft = Color(0xFF16302F);
-  static const accentFg = Color(0xFF05201E);
+  static const danger = Color(0xFFFF5577);
+  static const success = Color(0xFF39FF14);
+  static const warning = Color(0xFFB026FF);
 
-  static const danger = Color(0xFFE5716E);
-  static const success = Color(0xFF6FCF7F);
-  static const warning = Color(0xFFE0B44C);
-
-  // Celebration hues — accent plus fixed party colours, so confetti reads as
-  // confetti rather than a second product accent.
   static const party = <Color>[
-    accent,
-    Color(0xFFE8B64C),
-    Color(0xFFE0709A),
-    Color(0xFF7CC4E8),
-    Color(0xFFF0F1EE),
+    Color(0xFF39FF14),
+    Color(0xFFFF2D95),
+    Color(0xFFB026FF),
+    Color(0xFF41D9FF),
+    Color(0xFFF2F6F2),
   ];
 }
 
-/// The same palette, re-tuned for light mode. The accent shifts a shade darker
-/// so it keeps contrast against a white canvas.
+/// A clear light variant for system-selected light mode.
 class AppColorsLight {
   const AppColorsLight._();
-
-  static const canvas = Color(0xFFF7F8F6);
+  static const canvas = Color(0xFFF5F7F4);
+  static const canvasAlt = Color(0xFFE8EEE9);
   static const surface = Color(0xFFFFFFFF);
-  static const surface2 = Color(0xFFEFF1EE);
-  static const border = Color(0xFFE0E3DE);
-  static const borderStrong = Color(0xFFC4CAC3);
+  static const surface2 = Color(0xFFE9EEE9);
+  static const border = Color(0xFFD4DDD5);
+  static const borderStrong = Color(0xFFB8C5BA);
 
-  static const fg = Color(0xFF14181A);
-  static const muted = Color(0xFF5A636B);
-  static const subtle = Color(0xFF8A939B);
+  static const fg = Color(0xFF111713);
+  static const muted = Color(0xFF4F5C52);
+  static const subtle = Color(0xFF77837A);
 
-  static const accent = Color(0xFF14807A);
-  static const accentSoft = Color(0xFFDDF3F0);
+  static const accent = Color(0xFF2C9F13);
+  static const accent2 = Color(0xFFE61E7C);
+  static const accentSoft = Color(0xFFDFF4D8);
   static const accentFg = Color(0xFFFFFFFF);
 
-  static const danger = Color(0xFFC0392B);
-  static const success = Color(0xFF2F7D48);
-  static const warning = Color(0xFF9A6B12);
+  static const danger = Color(0xFFC52E4A);
+  static const success = Color(0xFF287C22);
+  static const warning = Color(0xFF7F37B6);
 }
 
 /// Everything a widget needs to paint, reachable through `context.colors`.
@@ -66,6 +64,7 @@ class AppColorsLight {
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette({
     required this.canvas,
+    required this.canvasAlt,
     required this.surface,
     required this.surface2,
     required this.border,
@@ -74,6 +73,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.muted,
     required this.subtle,
     required this.accent,
+    required this.accent2,
     required this.accentSoft,
     required this.accentFg,
     required this.danger,
@@ -82,6 +82,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   });
 
   final Color canvas;
+  final Color canvasAlt;
   final Color surface;
   final Color surface2;
   final Color border;
@@ -90,6 +91,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color muted;
   final Color subtle;
   final Color accent;
+  final Color accent2;
   final Color accentSoft;
   final Color accentFg;
   final Color danger;
@@ -102,6 +104,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   static const dark = AppPalette(
     canvas: AppColors.canvas,
+    canvasAlt: AppColors.canvasAlt,
     surface: AppColors.surface,
     surface2: AppColors.surface2,
     border: AppColors.border,
@@ -110,6 +113,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: AppColors.muted,
     subtle: AppColors.subtle,
     accent: AppColors.accent,
+    accent2: AppColors.accent2,
     accentSoft: AppColors.accentSoft,
     accentFg: AppColors.accentFg,
     danger: AppColors.danger,
@@ -119,6 +123,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   static const light = AppPalette(
     canvas: AppColorsLight.canvas,
+    canvasAlt: AppColorsLight.canvasAlt,
     surface: AppColorsLight.surface,
     surface2: AppColorsLight.surface2,
     border: AppColorsLight.border,
@@ -127,6 +132,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: AppColorsLight.muted,
     subtle: AppColorsLight.subtle,
     accent: AppColorsLight.accent,
+    accent2: AppColorsLight.accent2,
     accentSoft: AppColorsLight.accentSoft,
     accentFg: AppColorsLight.accentFg,
     danger: AppColorsLight.danger,
@@ -137,6 +143,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   @override
   AppPalette copyWith({
     Color? canvas,
+    Color? canvasAlt,
     Color? surface,
     Color? surface2,
     Color? border,
@@ -145,6 +152,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? muted,
     Color? subtle,
     Color? accent,
+    Color? accent2,
     Color? accentSoft,
     Color? accentFg,
     Color? danger,
@@ -153,6 +161,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   }) =>
       AppPalette(
         canvas: canvas ?? this.canvas,
+        canvasAlt: canvasAlt ?? this.canvasAlt,
         surface: surface ?? this.surface,
         surface2: surface2 ?? this.surface2,
         border: border ?? this.border,
@@ -161,6 +170,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         muted: muted ?? this.muted,
         subtle: subtle ?? this.subtle,
         accent: accent ?? this.accent,
+        accent2: accent2 ?? this.accent2,
         accentSoft: accentSoft ?? this.accentSoft,
         accentFg: accentFg ?? this.accentFg,
         danger: danger ?? this.danger,
@@ -173,6 +183,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     if (other is! AppPalette) return this;
     return AppPalette(
       canvas: Color.lerp(canvas, other.canvas, t)!,
+      canvasAlt: Color.lerp(canvasAlt, other.canvasAlt, t)!,
       surface: Color.lerp(surface, other.surface, t)!,
       surface2: Color.lerp(surface2, other.surface2, t)!,
       border: Color.lerp(border, other.border, t)!,
@@ -181,6 +192,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       muted: Color.lerp(muted, other.muted, t)!,
       subtle: Color.lerp(subtle, other.subtle, t)!,
       accent: Color.lerp(accent, other.accent, t)!,
+      accent2: Color.lerp(accent2, other.accent2, t)!,
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
       accentFg: Color.lerp(accentFg, other.accentFg, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
@@ -270,8 +282,8 @@ class AppTheme {
           foregroundColor: palette.accentFg,
           minimumSize: const Size.fromHeight(50),
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(

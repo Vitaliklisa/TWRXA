@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:datedawn/core/countdown.dart';
+import 'package:twrxa/core/countdown.dart';
 
 void main() {
   group('remainingUntil', () {
