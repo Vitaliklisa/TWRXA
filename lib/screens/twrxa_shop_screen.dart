@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/cart.dart';
+import '../providers/cart_provider.dart';
 
 const _acid = Color(0xFF39FF14);
 const _pink = Color(0xFFFF2D95);
@@ -7,23 +11,20 @@ const _black = Color(0xFF080B09);
 const _card = Color(0xFF111613);
 const _line = Color(0xFF28312B);
 
-class TwrxaShopScreen extends StatefulWidget {
+class TwrxaShopScreen extends ConsumerStatefulWidget {
   const TwrxaShopScreen({super.key});
 
   @override
-  State<TwrxaShopScreen> createState() => _TwrxaShopScreenState();
+  ConsumerState<TwrxaShopScreen> createState() => _TwrxaShopScreenState();
 }
 
-class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
+class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final _collectionKey = GlobalKey();
-  final Map<String, int> _bag = {};
   String _category = 'ALL';
   String _query = '';
   bool _searchOpen = false;
-
-  int get _bagCount => _bag.values.fold(0, (total, count) => total + count);
 
   List<_ShopProduct> get _visibleProducts {
     return _products.where((product) {
@@ -56,10 +57,22 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
     );
   }
 
-  void _addToBag(_ShopProduct product, {String size = 'M'}) {
-    final key = '${product.id}|$size';
-    setState(
-        () => _bag.update(key, (quantity) => quantity + 1, ifAbsent: () => 1));
+  Future<void> _addToBag(_ShopProduct product, {String size = 'M'}) async {
+    try {
+      await ref.read(cartProvider.notifier).addItem(
+            CartItem(
+              productId: product.id,
+              name: product.name,
+              unitAmount: product.price * 100,
+              quantity: 1,
+              variant: product.category == 'APPAREL' ? size : null,
+            ),
+          );
+    } catch (error) {
+      _showCartError(error);
+      return;
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -69,6 +82,20 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
           action: SnackBarAction(
             label: 'VIEW BAG',
             onPressed: _showBag,
+          ),
+        ),
+      );
+  }
+
+  void _showCartError(Object error) {
+    debugPrint('[twrxa] Cart operation failed: $error');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not sync your bag. Check your connection and retry.',
           ),
         ),
       );
@@ -202,14 +229,11 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, refresh) {
-          final lines = _bag.entries.toList();
-          final subtotal = lines.fold<int>(0, (total, line) {
-            final id = line.key.split('|').first;
-            final product = _products.firstWhere((item) => item.id == id);
-            return total + product.price * line.value;
-          });
+      builder: (sheetContext) => Consumer(
+        builder: (context, ref, _) {
+          final cartState = ref.watch(cartProvider);
+          final cart = cartState.value;
+          final lines = cart?.items ?? const <CartItem>[];
           return SafeArea(
             top: false,
             child: Container(
@@ -240,7 +264,7 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                           ),
                         ),
                         Text(
-                          '$_bagCount ITEMS',
+                          '${cart?.itemCount ?? 0} ITEMS',
                           style: const TextStyle(
                             color: _acid,
                             fontSize: 11,
@@ -251,7 +275,27 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    if (lines.isEmpty)
+                    if (cartState.isLoading && cart == null)
+                      const Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (cartState.hasError)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              const Text('Your bag could not be loaded.'),
+                              TextButton(
+                                onPressed: () => ref.invalidate(cartProvider),
+                                child: const Text('RETRY'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (lines.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 42),
                         child: Center(
@@ -279,24 +323,21 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                               const Divider(height: 22, color: _line),
                           itemBuilder: (context, index) {
                             final line = lines[index];
-                            final parts = line.key.split('|');
-                            final product = _products
-                                .firstWhere((item) => item.id == parts.first);
-                            final size = parts.length > 1 ? parts[1] : 'M';
+                            final product = _productById(line.productId);
+                            final accent = product?.artColor ?? _acid;
                             return Row(
                               children: [
                                 Container(
                                   width: 58,
                                   height: 58,
                                   decoration: BoxDecoration(
-                                    color: product.artColor.withValues(
-                                      alpha: 0.16,
-                                    ),
+                                    color: accent.withValues(alpha: 0.16),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
-                                    product.icon,
-                                    color: product.artColor,
+                                    product?.icon ??
+                                        Icons.shopping_bag_outlined,
+                                    color: accent,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -306,7 +347,7 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        product.name,
+                                        line.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -315,7 +356,7 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${product.category == 'APPAREL' ? 'Size $size · ' : ''}\$${product.price}',
+                                        '${line.variant == null ? '' : 'Size ${line.variant} · '}${_formatAmount(line.unitAmount)}',
                                         style: const TextStyle(
                                           color: Color(0xFF9BA69E),
                                           fontSize: 12,
@@ -325,11 +366,10 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  tooltip: 'Remove one ${product.name}',
+                                  tooltip: 'Remove one ${line.name}',
                                   onPressed: () => _changeQuantity(
-                                    line.key,
-                                    -1,
-                                    refresh,
+                                    line.id,
+                                    line.quantity - 1,
                                   ),
                                   icon: const Icon(
                                     Icons.remove_circle_outline_rounded,
@@ -337,17 +377,16 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${line.value}',
+                                  '${line.quantity}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 IconButton(
-                                  tooltip: 'Add one ${product.name}',
+                                  tooltip: 'Add one ${line.name}',
                                   onPressed: () => _changeQuantity(
-                                    line.key,
-                                    1,
-                                    refresh,
+                                    line.id,
+                                    line.quantity + 1,
                                   ),
                                   icon: const Icon(
                                     Icons.add_circle_outline_rounded,
@@ -375,7 +414,7 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
                             ),
                           ),
                           Text(
-                            '\$$subtotal',
+                            _formatAmount(cart!.subtotal),
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -411,20 +450,27 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
     );
   }
 
-  void _changeQuantity(
-    String key,
-    int amount,
-    void Function(void Function()) refresh,
-  ) {
-    setState(() {
-      final next = (_bag[key] ?? 0) + amount;
-      if (next <= 0) {
-        _bag.remove(key);
-      } else {
-        _bag[key] = next;
-      }
-    });
-    refresh(() {});
+  _ShopProduct? _productById(String productId) {
+    for (final product in _products) {
+      if (product.id == productId) return product;
+    }
+    return null;
+  }
+
+  String _formatAmount(int cents) {
+    final dollars = cents ~/ 100;
+    final remainingCents = cents % 100;
+    return remainingCents == 0
+        ? '\$$dollars'
+        : '\$$dollars.${remainingCents.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _changeQuantity(String itemId, int quantity) async {
+    try {
+      await ref.read(cartProvider.notifier).setQuantity(itemId, quantity);
+    } catch (error) {
+      _showCartError(error);
+    }
   }
 
   void _showCheckoutNotice() {
@@ -448,6 +494,18 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(cartProvider, (previous, next) {
+      if (next.hasError && previous?.hasError != true) {
+        _showCartError(next.error!);
+      }
+    });
+    final cartState = ref.watch(cartProvider);
+    final cart = cartState.value;
+    final bagLabel = cartState.hasError
+        ? 'BAG !'
+        : cart == null
+            ? 'BAG …'
+            : 'BAG ${cart.itemCount}';
     return Scaffold(
       backgroundColor: _black,
       body: SafeArea(
@@ -460,7 +518,11 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
               slivers: [
                 SliverToBoxAdapter(child: _announcement()),
                 SliverToBoxAdapter(
-                  child: _header(horizontal: horizontal, wide: width > 720),
+                  child: _header(
+                    horizontal: horizontal,
+                    wide: width > 720,
+                    bagLabel: bagLabel,
+                  ),
                 ),
                 if (_searchOpen)
                   SliverToBoxAdapter(
@@ -570,7 +632,11 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
         ),
       );
 
-  Widget _header({required double horizontal, required bool wide}) {
+  Widget _header({
+    required double horizontal,
+    required bool wide,
+    required String bagLabel,
+  }) {
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 16),
       child: Row(
@@ -620,7 +686,7 @@ class _TwrxaShopScreenState extends State<TwrxaShopScreen> {
             key: const ValueKey('cart-button'),
             onPressed: _showBag,
             icon: const Icon(Icons.shopping_bag_outlined, size: 17),
-            label: Text('BAG $_bagCount'),
+            label: Text(bagLabel),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: const BorderSide(color: _line),

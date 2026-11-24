@@ -1,11 +1,32 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:twrxa/main.dart';
+import 'package:twrxa/providers/app_providers.dart';
+import 'package:twrxa/providers/cart_provider.dart';
+import 'package:twrxa/services/cart_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('the app launches into the TWRXA shop without signing in',
       (tester) async {
-    await tester.pumpWidget(const TwrxaApp());
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeAuthStateProvider.overrideWith((ref) => Stream.value(null)),
+          cartRepositoryProvider.overrideWithValue(
+            CartRepository(
+              firestore: FakeFirebaseFirestore(),
+              preferences: preferences,
+            ),
+          ),
+        ],
+        child: const TwrxaApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('brand-wordmark')), findsOneWidget);

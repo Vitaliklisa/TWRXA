@@ -646,6 +646,27 @@ service cloud.firestore {
         && request.resource.data.createdBy == uid();
     }
 
+    // A cart is private to its owner. Prices in cart documents are untrusted;
+    // checkout must re-read product prices from the server-side catalog.
+    match /carts/{userId} {
+      allow read: if signedIn() && userId == uid();
+      allow create, update: if signedIn()
+        && userId == uid()
+        && request.resource.data.keys().hasOnly([
+          'items',
+          'updatedAt',
+          'lastGuestMigrationId'
+        ])
+        && request.resource.data.keys().hasAll(['items', 'updatedAt'])
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 100
+        && request.resource.data.updatedAt is timestamp
+        && (!('lastGuestMigrationId' in request.resource.data.keys())
+          || (request.resource.data.lastGuestMigrationId is string
+            && request.resource.data.lastGuestMigrationId.size() <= 128));
+      allow delete: if signedIn() && userId == uid();
+    }
+
     // ---------- users ----------
     //
     // A tiny public profile per account. It exists so an inviter can turn an

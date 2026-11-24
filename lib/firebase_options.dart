@@ -47,16 +47,15 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyA3nS579jUK46wfNtUsYq4qFui8bBiRsws',
-    appId: '1:255395342604:web:225f0e20966a0c39f10129',
-    messagingSenderId: '255395342604',
-    projectId: 'datedawn',
+    apiKey: 'AIzaSyCHjO5zVnSoxEnrn4htvXwNyTd-_CUb4cY',
+    appId: '1:1090310833535:web:daeac6982ec452204ac64a',
+    messagingSenderId: '1090310833535',
+    projectId: 'twrxa-shop',
     authDomain: const String.fromEnvironment(
       'FIREBASE_AUTH_DOMAIN',
-      defaultValue: 'datedawn.firebaseapp.com',
+      defaultValue: 'twrxa-shop.firebaseapp.com',
     ),
-    storageBucket: 'datedawn.firebasestorage.app',
-    measurementId: 'G-GF48EGQGFF',
+    storageBucket: 'twrxa-shop.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

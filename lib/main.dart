@@ -1,13 +1,19 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'core/theme.dart';
+import 'firebase_options.dart';
 import 'screens/twrxa_shop_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   usePathUrlStrategy();
-  runApp(const TwrxaApp());
+  runApp(const ProviderScope(child: TwrxaApp()));
 }
 
 class TwrxaApp extends StatelessWidget {
