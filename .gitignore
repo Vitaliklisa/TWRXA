@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 node_modules/
+.wrangler/
+/dist/
 # --- Flutter / Dart ---
 .dart_tool/
 .packages

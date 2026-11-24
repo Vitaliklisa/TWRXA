@@ -38,15 +38,19 @@ class CheckoutService {
   final http.Client _client;
   final Uri? _baseUri;
 
-  static const _configuredBaseUrl = String.fromEnvironment('APP_BASE_URL');
+  static const _configuredApiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://api.twrxa.khomenko.de',
+  );
 
   Uri get _apiBaseUri {
     if (_baseUri != null) return _baseUri;
-    if (kIsWeb) return Uri.base;
-    if (_configuredBaseUrl.isNotEmpty) return Uri.parse(_configuredBaseUrl);
-    throw const CheckoutFailure(
-      'The store API URL is not configured for this platform.',
-    );
+    final uri = Uri.tryParse(_configuredApiBaseUrl);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      throw const CheckoutFailure(
+          'The store API URL is not configured correctly.');
+    }
+    return uri;
   }
 
   Future<Map<String, dynamic>> _request(

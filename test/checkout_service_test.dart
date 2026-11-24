@@ -69,4 +69,23 @@ void main() {
     expect(session.orderId, 'order_test_12345');
     expect(session.url.host, 'checkout.stripe.com');
   });
+
+  test('uses the Cloudflare Worker API default when no base URL is injected',
+      () async {
+    final auth = _MockFirebaseAuth();
+    final user = _MockUser();
+    when(() => auth.currentUser).thenReturn(user);
+    when(() => user.getIdToken()).thenAnswer((_) async => 'firebase-id-token');
+    final client = MockClient((request) async {
+      expect(
+        request.url,
+        Uri.parse(
+            'https://api.twrxa.khomenko.de/api/order-tracking?orderId=order_test_12345'),
+      );
+      return http.Response('{}', 200);
+    });
+    final service = CheckoutService(auth: auth, client: client);
+
+    await service.getOrderTracking('order_test_12345');
+  });
 }
