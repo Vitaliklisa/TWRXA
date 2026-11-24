@@ -7,6 +7,7 @@ import 'core/theme.dart';
 import 'core/routes.dart';
 import 'firebase_options.dart';
 import 'screens/faq_screen.dart';
+import 'screens/product_detail_screen.dart';
 import 'screens/public_offer_screen.dart';
 import 'screens/twrxa_shop_screen.dart';
 import 'screens/track_order_screen.dart';
@@ -30,6 +31,12 @@ class TwrxaApp extends StatelessWidget {
         theme: AppTheme.build(brightness: Brightness.dark),
         home: const TwrxaShopScreen(),
         routes: {
+          Routes.productDetail: (context) {
+            final productId = ModalRoute.of(context)?.settings.arguments;
+            return ProductDetailScreen(
+              productId: productId is String ? productId : '',
+            );
+          },
           Routes.trackOrder: (context) => TrackOrderScreen(
                 initialOrderId:
                     ModalRoute.of(context)?.settings.arguments as String?,

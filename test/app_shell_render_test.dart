@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:twrxa/main.dart';
 import 'package:twrxa/providers/app_providers.dart';
 import 'package:twrxa/providers/cart_provider.dart';
+import 'package:twrxa/providers/store_products_provider.dart';
 import 'package:twrxa/services/cart_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,13 +14,15 @@ void main() {
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
+    final firestore = FakeFirebaseFirestore();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           activeAuthStateProvider.overrideWith((ref) => Stream.value(null)),
+          storeProductsFirestoreProvider.overrideWithValue(firestore),
           cartRepositoryProvider.overrideWithValue(
             CartRepository(
-              firestore: FakeFirebaseFirestore(),
+              firestore: firestore,
               preferences: preferences,
             ),
           ),

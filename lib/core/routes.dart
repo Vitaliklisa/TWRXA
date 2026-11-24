@@ -65,6 +65,7 @@ class Routes {
   static const trackOrder = '/track-order';
   static const faq = '/faq';
   static const publicOffer = '/public-offer';
+  static const productDetail = '/product-detail';
 }
 
 /// Which legal document, if any, is open over the current page.

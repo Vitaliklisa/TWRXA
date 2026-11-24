@@ -8,7 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/cart.dart';
 import '../core/product_sort.dart';
 import '../core/routes.dart';
+import '../core/store_product.dart';
 import '../providers/cart_provider.dart';
+import '../providers/store_products_provider.dart';
 import '../services/checkout_service.dart';
 
 const _acid = Color(0xFF39FF14);
@@ -43,8 +45,8 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     });
   }
 
-  List<_ShopProduct> get _visibleProducts {
-    final filtered = _products.where((product) {
+  List<StoreProduct> _visibleProducts(Iterable<StoreProduct> products) {
+    final filtered = products.where((product) {
       final matchesCategory = switch (_category) {
         'ALL' => true,
         'APPAREL' => product.isApparel,
@@ -87,15 +89,16 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     );
   }
 
-  Future<void> _addToBag(_ShopProduct product, {String size = 'M'}) async {
+  Future<void> _addToBag(StoreProduct product, {String? variant}) async {
     try {
       await ref.read(cartProvider.notifier).addItem(
             CartItem(
               productId: product.id,
               name: product.name,
-              unitAmount: product.price * 100,
+              unitAmount: product.unitAmountFor(variant),
               quantity: 1,
-              variant: product.isApparel ? size : null,
+              currency: product.currency,
+              variant: variant,
             ),
           );
     } catch (error) {
@@ -131,7 +134,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
       );
   }
 
-  void _showProduct(_ShopProduct product) {
+  void _showProduct(StoreProduct product) {
     var selectedSize = 'M';
     showModalBottomSheet<void>(
       context: context,
@@ -181,7 +184,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                         ),
                       ),
                       Text(
-                        '\$${product.price}',
+                        _formatAmount(product.price),
                         style: const TextStyle(
                           color: _acid,
                           fontSize: 20,
@@ -239,7 +242,10 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                     child: FilledButton.icon(
                       onPressed: () {
                         Navigator.pop(sheetContext);
-                        _addToBag(product, size: selectedSize);
+                        _addToBag(
+                          product,
+                          variant: product.isApparel ? selectedSize : null,
+                        );
                       },
                       icon: const Icon(Icons.add_rounded),
                       label: const Text('ADD TO BAG'),
@@ -491,7 +497,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     );
   }
 
-  _ShopProduct? _productById(String productId) {
+  StoreProduct? _productById(String productId) {
     for (final product in _products) {
       if (product.id == productId) return product;
     }
@@ -622,6 +628,10 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     });
     final cartState = ref.watch(cartProvider);
     final cart = cartState.value;
+    final catalogState = ref.watch(storeProductsProvider);
+    final catalogProducts =
+        catalogState.hasValue ? catalogState.value ?? _products : _products;
+    final visibleProducts = _visibleProducts(catalogProducts);
     final bagLabel = cartState.hasError
         ? 'BAG !'
         : cart == null
@@ -685,7 +695,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                     key: _collectionKey,
                     padding:
                         EdgeInsets.fromLTRB(horizontal, 48, horizontal, 18),
-                    child: _collectionHeader(width),
+                    child: _collectionHeader(width, visibleProducts.length),
                   ),
                 ),
                 SliverPadding(
@@ -698,7 +708,24 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                           : availableWidth > 720
                               ? 3
                               : 2;
-                      final products = _visibleProducts;
+                      final products = visibleProducts;
+                      if (catalogState.hasError && !catalogState.hasValue) {
+                        return const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 54),
+                            child: Center(
+                              child: Text(
+                                'COULD NOT LOAD PRODUCTS. PLEASE RETRY.',
+                                style: TextStyle(
+                                  color: Color(0xFFFF8B8B),
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
                       if (products.isEmpty) {
                         return SliverToBoxAdapter(
                           child: Padding(
@@ -1022,7 +1049,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     );
   }
 
-  Widget _collectionHeader(double width) {
+  Widget _collectionHeader(double width, int productCount) {
     const categories = ['ALL', 'APPAREL', 'ACCESSORIES'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1057,7 +1084,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
             ),
             if (width > 650)
               Text(
-                '${_visibleProducts.length.toString().padLeft(2, '0')} PIECES',
+                '${productCount.toString().padLeft(2, '0')} PIECES',
                 style: const TextStyle(
                   color: Color(0xFF909B93),
                   fontSize: 10,
@@ -1136,10 +1163,10 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     );
   }
 
-  Widget _productCard(_ShopProduct product) {
+  Widget _productCard(StoreProduct product) {
     return Semantics(
       key: ValueKey('product-card-${product.id}'),
-      label: '${product.name}, \$${product.price}',
+      label: '${product.name}, ${_formatAmount(product.price)}',
       button: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1153,7 +1180,16 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                     borderRadius: BorderRadius.circular(16),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => _showProduct(product),
+                      onTap: () {
+                        if (product.fromFirestore) {
+                          Navigator.of(context).pushNamed(
+                            Routes.productDetail,
+                            arguments: product.id,
+                          );
+                        } else {
+                          _showProduct(product);
+                        }
+                      },
                       child: _ProductArtwork(product: product),
                     ),
                   ),
@@ -1185,7 +1221,10 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                   child: IconButton.filled(
                     key: ValueKey('quick-add-${product.id}'),
                     tooltip: 'Add ${product.name} to bag',
-                    onPressed: () => _addToBag(product),
+                    onPressed: () => _addToBag(
+                      product,
+                      variant: product.quickAddVariant,
+                    ),
                     style: IconButton.styleFrom(
                       backgroundColor: _acid,
                       foregroundColor: _black,
@@ -1228,7 +1267,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                '\$${product.price}',
+                _formatAmount(product.price),
                 style: const TextStyle(
                   color: _acid,
                   fontSize: 13,
@@ -1448,7 +1487,7 @@ class _HeroArtwork extends StatelessWidget {
 class _ProductArtwork extends StatelessWidget {
   const _ProductArtwork({required this.product, this.height});
 
-  final _ShopProduct product;
+  final StoreProduct product;
   final double? height;
 
   @override
@@ -1468,6 +1507,15 @@ class _ProductArtwork extends StatelessWidget {
       ),
       child: Stack(
         children: [
+          if (product.images.isNotEmpty)
+            Positioned.fill(
+              child: Image.network(
+                product.images.first,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(),
+              ),
+            ),
           Positioned(
             right: -24,
             top: -34,
@@ -1485,7 +1533,9 @@ class _ProductArtwork extends StatelessWidget {
               child: Icon(
                 product.icon,
                 size: height == null ? 106 : 132,
-                color: product.artColor.withValues(alpha: 0.92),
+                color: product.artColor.withValues(
+                  alpha: product.images.isEmpty ? 0.92 : 0.22,
+                ),
                 shadows: [
                   Shadow(
                     color: product.artColor.withValues(alpha: 0.32),
@@ -1601,47 +1651,13 @@ class _TeePainter extends CustomPainter {
   bool shouldRepaint(_TeePainter oldDelegate) => false;
 }
 
-class _ShopProduct {
-  const _ShopProduct({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.price,
-    required this.createdAt,
-    required this.description,
-    required this.tag,
-    required this.artLabel,
-    required this.artColor,
-    required this.icon,
-  });
-
-  final String id;
-  final String name;
-  final String category;
-  final int price;
-  final DateTime createdAt;
-  final String description;
-  final String tag;
-  final String artLabel;
-  final Color artColor;
-  final IconData icon;
-
-  bool get isApparel => const {
-        'T-SHIRTS',
-        'HOODIES',
-        'OUTERWEAR',
-        'TROUSERS',
-        'POLO',
-        'SHIRTS'
-      }.contains(category);
-}
-
-final _products = <_ShopProduct>[
-  _ShopProduct(
+final _products = <StoreProduct>[
+  StoreProduct(
     id: 'heavy-tee',
     name: 'Heavyweight Tee',
     category: 'T-SHIRTS',
-    price: 48,
+    price: 4800,
+    currency: 'usd',
     createdAt: DateTime(2026, 7, 14),
     description:
         'An oversized, heavyweight daily uniform with a clean finish and room to move.',
@@ -1650,11 +1666,12 @@ final _products = <_ShopProduct>[
     artColor: _acid,
     icon: Icons.checkroom_rounded,
   ),
-  _ShopProduct(
+  StoreProduct(
     id: 'static-hoodie',
     name: 'Static Zip Hoodie',
     category: 'HOODIES',
-    price: 98,
+    price: 9800,
+    currency: 'usd',
     createdAt: DateTime(2026, 8, 20),
     description:
         'A substantial zip layer for cold platforms, late sets, and everywhere between.',
@@ -1663,11 +1680,12 @@ final _products = <_ShopProduct>[
     artColor: _pink,
     icon: Icons.layers_rounded,
   ),
-  _ShopProduct(
+  StoreProduct(
     id: 'signal-shell',
     name: 'Signal Shell',
     category: 'OUTERWEAR',
-    price: 148,
+    price: 14800,
+    currency: 'usd',
     createdAt: DateTime(2026, 4, 4),
     description:
         'Lightweight protection with utility details for unpredictable nights.',
@@ -1676,11 +1694,12 @@ final _products = <_ShopProduct>[
     artColor: _violet,
     icon: Icons.hiking_rounded,
   ),
-  _ShopProduct(
+  StoreProduct(
     id: 'utility-cargo',
     name: 'Utility Cargo',
     category: 'TROUSERS',
-    price: 88,
+    price: 8800,
+    currency: 'usd',
     createdAt: DateTime(2026, 6, 14),
     description:
         'Easy-fit cargo trousers with considered pockets and an adjustable hem.',
@@ -1689,11 +1708,12 @@ final _products = <_ShopProduct>[
     artColor: const Color(0xFFB6FF55),
     icon: Icons.inventory_2_outlined,
   ),
-  _ShopProduct(
+  StoreProduct(
     id: 'crossbody',
     name: 'Night Shift Sling',
     category: 'BAGS',
-    price: 58,
+    price: 5800,
+    currency: 'usd',
     createdAt: DateTime(2026, 5, 4),
     description:
         'A compact carry-all for the essentials you actually bring with you.',
@@ -1702,11 +1722,12 @@ final _products = <_ShopProduct>[
     artColor: const Color(0xFFFF8B4A),
     icon: Icons.local_mall_outlined,
   ),
-  _ShopProduct(
+  StoreProduct(
     id: 'logo-cap',
     name: 'No Signal Cap',
     category: 'CAPS',
-    price: 38,
+    price: 3800,
+    currency: 'usd',
     createdAt: DateTime(2026, 9, 10),
     description:
         'Low-profile six-panel cap. Small mark up front, no noise anywhere else.',

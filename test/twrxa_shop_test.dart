@@ -5,6 +5,7 @@ import 'package:twrxa/core/theme.dart';
 import 'package:twrxa/main.dart';
 import 'package:twrxa/providers/app_providers.dart';
 import 'package:twrxa/providers/cart_provider.dart';
+import 'package:twrxa/providers/store_products_provider.dart';
 import 'package:twrxa/services/cart_repository.dart';
 import 'package:twrxa/screens/twrxa_shop_screen.dart';
 import 'package:flutter/material.dart';
@@ -14,12 +15,14 @@ void main() {
   Future<ProviderScope> testScope(Widget child) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
+    final firestore = FakeFirebaseFirestore();
     return ProviderScope(
       overrides: [
         activeAuthStateProvider.overrideWith((ref) => Stream.value(null)),
+        storeProductsFirestoreProvider.overrideWithValue(firestore),
         cartRepositoryProvider.overrideWithValue(
           CartRepository(
-            firestore: FakeFirebaseFirestore(),
+            firestore: firestore,
             preferences: preferences,
           ),
         ),
