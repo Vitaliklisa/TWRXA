@@ -2,7 +2,41 @@ const crypto = require("node:crypto");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { normalizeCartItems, trackingFields, verifyPrintifySignature } = require("../domain");
+const {
+  checkoutVariantMapping,
+  normalizeCartItems,
+  trackingFields,
+  verifyPrintifySignature,
+} = require("../domain");
+
+test("checkout variant mapping uses variant prices and retains legacy base prices", () => {
+  assert.deepEqual(
+    checkoutVariantMapping(
+      {
+        price: 2500,
+        printifyVariants: { S: 101, M: 102 },
+        printifyVariantPrices: { S: 2500, M: 2800 },
+      },
+      "M",
+    ),
+    { printifyVariantId: 102, unitAmount: 2800 },
+  );
+  assert.deepEqual(
+    checkoutVariantMapping({ price: 2500, printifyVariants: { default: 101 } }, null),
+    { printifyVariantId: 101, unitAmount: 2500 },
+  );
+  assert.equal(
+    checkoutVariantMapping(
+      {
+        price: 2500,
+        printifyVariants: { M: 102 },
+        printifyVariantPrices: { S: 2500 },
+      },
+      "M",
+    ),
+    null,
+  );
+});
 
 test("checkout cart input accepts only bounded product IDs and quantities", () => {
   assert.deepEqual(normalizeCartItems([{ productId: "heavy-tee", quantity: 2, variant: "M" }]), [

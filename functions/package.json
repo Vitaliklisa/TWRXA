@@ -6,7 +6,8 @@
   },
   "main": "index.js",
   "scripts": {
-    "check": "node --check index.js && node --test test/*.test.js"
+    "check": "node --check index.js && node --test test/*.test.js",
+    "sync-products": "node scripts/sync-printify-products.js"
   },
   "dependencies": {
     "firebase-admin": "^13.6.0",

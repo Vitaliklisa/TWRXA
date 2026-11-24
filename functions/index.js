@@ -4,7 +4,12 @@ const { defineInt, defineSecret, defineString } = require("firebase-functions/pa
 const { HttpsError, onCall, onRequest } = require("firebase-functions/v2/https");
 const Stripe = require("stripe");
 
-const { normalizeCartItems, trackingFields, verifyPrintifySignature } = require("./domain");
+const {
+  checkoutVariantMapping,
+  normalizeCartItems,
+  trackingFields,
+  verifyPrintifySignature,
+} = require("./domain");
 
 if (admin.apps.length === 0) admin.initializeApp();
 const db = admin.firestore();
@@ -108,7 +113,8 @@ function productForCheckout(productId, productData, variant) {
     typeof productData.printifyProductId !== "string" ||
     productData.printifyProductId.length === 0 ||
     !productData.printifyVariants ||
-    typeof productData.printifyVariants !== "object"
+    typeof productData.printifyVariants !== "object" ||
+    Array.isArray(productData.printifyVariants)
   ) {
     throw new HttpsError(
       "failed-precondition",
@@ -116,12 +122,11 @@ function productForCheckout(productId, productData, variant) {
     );
   }
 
-  const variantKey = variant ?? "default";
-  const printifyVariantId = productData.printifyVariants[variantKey];
-  if (!Number.isSafeInteger(printifyVariantId) || printifyVariantId < 1) {
+  const mapping = checkoutVariantMapping(productData, variant);
+  if (!mapping) {
     throw new HttpsError(
       "failed-precondition",
-      `Product ${productId} does not have a Printify mapping for ${variantKey}.`,
+      `Product ${productId} does not have a valid Printify variant and price mapping for ${variant ?? "default"}.`,
     );
   }
 
@@ -129,10 +134,10 @@ function productForCheckout(productId, productData, variant) {
     productId,
     name: productData.name,
     variant,
-    unitAmount: productData.price,
+    unitAmount: mapping.unitAmount,
     currency: productData.currency,
     printifyProductId: productData.printifyProductId,
-    printifyVariantId,
+    printifyVariantId: mapping.printifyVariantId,
   };
 }
 

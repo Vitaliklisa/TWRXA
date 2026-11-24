@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const maximumCheckoutAmount = 99999999;
 
 function normalizeCartItems(items) {
   if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
@@ -27,6 +28,25 @@ function normalizeCartItems(items) {
       variant: item.variant ?? null,
     };
   });
+}
+
+function checkoutVariantMapping(productData, variant) {
+  const key = variant ?? "default";
+  const printifyVariantId = productData.printifyVariants?.[key];
+  const hasVariantPriceMap = productData.printifyVariantPrices != null;
+  const unitAmount = hasVariantPriceMap
+    ? productData.printifyVariantPrices[key]
+    : productData.price;
+  if (
+    !Number.isSafeInteger(printifyVariantId) ||
+    printifyVariantId < 1 ||
+    !Number.isSafeInteger(unitAmount) ||
+    unitAmount < 1 ||
+    unitAmount > maximumCheckoutAmount
+  ) {
+    return null;
+  }
+  return { printifyVariantId, unitAmount };
 }
 
 function verifyPrintifySignature(rawBody, signature, secret) {
@@ -79,6 +99,7 @@ function trackingFields(printifyOrder) {
 }
 
 module.exports = {
+  checkoutVariantMapping,
   normalizeCartItems,
   trackingFields,
   verifyPrintifySignature,

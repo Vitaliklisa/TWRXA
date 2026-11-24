@@ -36,22 +36,81 @@ The document ID must match the Flutter cart's product ID. For example, the
     "M": 222222,
     "L": 333333,
     "XL": 444444
+  },
+  "printifyVariantPrices": {
+    "S": 4800,
+    "M": 4800,
+    "L": 5200,
+    "XL": 5200
   }
 }
 ```
 
 `price` is an integer in the currency's smallest unit (for example, 4800 is
-USD 48.00). Accessories without selectable variants use a `default` entry in
-`printifyVariants`. Use actual product and variant IDs from the connected
-Printify shop; the function rejects missing or inactive catalog entries. The
-Flutter catalog is currently sample content and does not contain real Printify
-IDs.
+USD 48.00). `printifyVariantPrices` can override it for each variant when
+Printify variants have different prices. Accessories with exactly one variant
+use a `default` entry in `printifyVariants`. Use actual product and variant
+IDs from the connected Printify shop; the function rejects missing or inactive
+catalog entries. The Flutter catalog is currently sample content and does not
+contain real Printify IDs. The importer seeds server-side data but does not
+replace the sample products shown in the storefront; the UI still needs to be
+connected to this collection before imported products appear in the grid.
 
 Product documents are publicly readable and server-managed. Firestore rules
 deny client writes to products and orders. Deploy the rules and product indexes
 after adding the catalog.
 
-## 3. Function parameters and secrets
+## 3. Import products from Printify
+
+The importer fetches every page from
+`GET /v1/shops/{shop_id}/products.json` and upserts documents at
+`products/{printifyProductId}`. It maps enabled variant IDs and prices into
+`printifyVariants` and `printifyVariantPrices`; prices are integer minor units
+used by Stripe. A unique size selection (for example, `M`) maps directly to
+its Printify variant. Products whose choices cannot be uniquely selected by
+the current storefront are imported with `active: false`, preventing checkout
+from submitting the wrong size or color.
+
+Install the Functions dependencies and authenticate Firebase Admin locally.
+Application Default Credentials are recommended. The signed-in Google account
+must have Firestore write access to `twrxa-shop`, and the Printify token must
+be allowed to read shop products:
+
+```powershell
+gcloud auth application-default login
+npm --prefix functions ci
+```
+
+In PowerShell, enter the Printify token without putting it in shell history,
+then set the shop ID:
+
+```powershell
+$token = Read-Host "Printify API token" -AsSecureString
+$env:PRINTIFY_API_TOKEN = (New-Object System.Net.NetworkCredential("", $token)).Password
+$env:PRINTIFY_SHOP_ID = Read-Host "Printify shop ID"
+```
+
+Preview first. The script does not write unless `--apply` is specified:
+
+```powershell
+npm --prefix functions run sync-products -- --project twrxa-shop --currency USD
+npm --prefix functions run sync-products -- --project twrxa-shop --currency USD --apply
+```
+
+Review dry-run warnings, especially inactive products with color/size
+combinations. The script does not delete products no longer present in
+Printify. The source is
+`functions/scripts/sync-printify-products.js`; its API token is read only from
+`PRINTIFY_API_TOKEN` and is never written to Firestore or logs.
+
+Firestore creates the `products` collection automatically on the first write.
+Deploy the configured indexes separately:
+
+```powershell
+firebase deploy --only firestore:indexes --project twrxa-shop
+```
+
+## 4. Function parameters and secrets
 
 Deploying prompts for these non-secret Firebase Functions parameters:
 
@@ -105,7 +164,7 @@ returning a tracking summary. Customers must use the same browser session or
 Firebase account used at checkout. Tracking data is refreshed by Printify
 webhook events.
 
-## 4. Local checks
+## 5. Local checks
 
 ```powershell
 npm --prefix functions run check
