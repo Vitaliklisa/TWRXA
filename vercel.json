@@ -4,6 +4,13 @@
   "installCommand": "npm ci",
   "buildCommand": "bash scripts/build-vercel-web.sh",
   "outputDirectory": "build/web",
+  "redirects": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.twrxa.khomenko.de/api/:path*",
+      "statusCode": 308
+    }
+  ],
   "rewrites": [
     {
       "source": "/__/auth/(.*)",

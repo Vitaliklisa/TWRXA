@@ -1,35 +1,51 @@
-# Future Cloudflare Workers migration
+# Cloudflare Workers commerce API
 
-This is a future option, not part of the current Vercel deployment. Firebase
-Auth and Firestore remain the system of record.
+The Cloudflare Worker implementation lives in `worker/` and is intended to
+serve commerce endpoints on `api.twrxa.khomenko.de`. This repository change
+adds the implementation alongside the existing Vercel handlers; it does not
+deploy the Worker, change DNS, configure provider dashboards, or move webhook
+destinations. Until the Worker is deployed and verified, keep the current
+provider webhook destinations unchanged.
 
-If moving the commerce backend from Vercel to Workers:
+## Architecture
 
-1. Preserve the existing endpoint contracts used by Flutter:
-   `/api/checkout-session`, `/api/stripe-webhook`,
-   `/api/printify-webhook`, `/api/order-tracking`, `/api/sync-products`, and
-   `/api/health`.
-2. Replace Vercel request/response handlers with Worker `Request`/`Response`
-   handlers and a scheduled Worker for product sync. Use Workers Secrets for
-   Stripe, Printify, Firebase Admin, and cron credentials.
-3. Re-implement Firebase ID-token verification and Firestore access using a
-   supported server-side Firebase Admin runtime or the authenticated Firebase
-   REST APIs. Verify token revocation and preserve owner-scoped order reads.
-4. Verify Stripe signatures against `await request.arrayBuffer()` before
-   parsing JSON, and verify Printify HMAC signatures against the original raw
-   bytes. Never parse/reserialize webhook bodies before signature validation.
-5. Retain the checkout invariants: prices and variant IDs come from Firestore,
-   all cart lines are validated, destination charge metadata matches the
-   stored order, and fulfillment is idempotent/reconcilable.
-6. Recreate health reporting, catalog last-sync metadata, deployment
-   configuration, and a daily-or-better schedule supported by the selected
-   Cloudflare plan.
-7. Test with Stripe test mode and a Printify test/draft order, then update the
-   frontend API base only if the Worker is intentionally cross-origin. If it
-   becomes cross-origin, use a strict allowlist for CORS and Firebase token
-   forwarding.
+- Flutter sends commerce API requests to the Worker API hostname. The web
+  build can override this with `API_BASE_URL`.
+- Vercel forwards legacy `/api/*` requests to the Worker using HTTP 308, which
+  preserves webhook POST methods and bodies.
+- Firebase Authentication and Firestore remain the identity and data systems.
+  The Worker verifies Firebase ID tokens and uses Firestore REST with a short
+  lived Google OAuth access token signed using Web Crypto.
+- Stripe Checkout uses Connect destination charges. Stripe webhooks are
+  signature-verified against the original request bytes before processing.
+- Printify API calls and webhooks handle catalog sync, fulfillment, and
+  tracking. Printify webhooks are also verified against their original bytes.
+- A daily Worker cron runs the catalog sync. Signed Printify product webhooks
+  provide the near-real-time sync path.
 
-Do not configure Vercel and Workers to process the same Stripe or Printify
-webhooks simultaneously. Switch provider webhook destinations only after the
-Worker has passed staging verification, otherwise an order could be fulfilled
-twice.
+## Configuration and deployment
+
+See [BACKEND_DEPLOYMENT.md](./BACKEND_DEPLOYMENT.md) for the Worker variables
+and secret names, Firebase permissions, commands, and staged rollout checklist.
+The API hostname is configured as a Cloudflare Custom Domain in `wrangler.toml`;
+Cloudflare manages its DNS record and certificate. Do not add a competing
+`workers.dev` CNAME.
+
+Deployment must be staged: deploy and configure the Worker, test checkout in
+Stripe test mode and a Printify draft/test order, confirm tracking and retries,
+then switch webhook destinations. Never configure Vercel and the Worker to
+process the same provider events concurrently because that can duplicate
+fulfillment.
+
+## Validation
+
+Run the local checks before deployment:
+
+```powershell
+npm run typecheck
+npm run worker:test
+npx wrangler deploy --dry-run --outdir dist
+```
+
+The dry run only builds the Worker bundle; `npm run worker:deploy` performs an
+actual deployment and is intentionally not part of local validation.
