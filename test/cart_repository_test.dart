@@ -79,6 +79,25 @@ void main() {
     expect(cart.items.map((item) => item.id).toSet(), hasLength(2));
   });
 
+  test('cart serialization preserves the exact Printify variant ID', () {
+    final cart = Cart(
+      items: const [
+        CartItem(
+          productId: 'shirt',
+          name: 'Color Shirt',
+          unitAmount: 2800,
+          quantity: 1,
+          variant: 'White / M',
+          variantId: 104,
+        ),
+      ],
+    );
+
+    final restored = Cart.fromJson(cart.toJson());
+    expect(restored.items.single.variant, 'White / M');
+    expect(restored.items.single.variantId, 104);
+  });
+
   test('web guest storage persists in cookies and migrates to Firestore',
       () async {
     final cookies = _MemoryGuestCartStorage();

@@ -1,4 +1,3 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -62,18 +61,6 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     try {
       final order = await _checkoutService.getOrderTracking(orderId);
       if (mounted) setState(() => _order = order);
-    } on FirebaseFunctionsException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = switch (error.code) {
-          'unauthenticated' =>
-            'Sign in with the same account used at checkout to view this order.',
-          'not-found' => 'No order was found for this account and ID.',
-          'invalid-argument' => 'Enter a valid order ID and try again.',
-          _ =>
-            error.message ?? 'Could not load tracking details. Please retry.',
-        };
-      });
     } on CheckoutFailure catch (error) {
       if (mounted) setState(() => _errorMessage = error.message);
     } catch (error, stackTrace) {

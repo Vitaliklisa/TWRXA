@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 FLUTTER_VERSION="$(tr -d '[:space:]' < "$ROOT_DIR/.flutter-version")"
-FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-datedawn.firebaseapp.com}"
+FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-twrxa-shop.firebaseapp.com}"
 FLUTTER_SHA256="f1631b9c2c8b3529323db412b0d1beacf4a748f8783b0d7cf599a8fd5f461675"
 FLUTTER_HOME="${FLUTTER_HOME:-$HOME/.cache/flutter/$FLUTTER_VERSION}"
 FLUTTER_ARCHIVE="$HOME/.cache/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -89,16 +88,22 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     );
   }
 
-  Future<void> _addToBag(StoreProduct product, {String? variant}) async {
+  Future<void> _addToBag(
+    StoreProduct product, {
+    String? variant,
+    StoreProductVariant? selectedVariant,
+  }) async {
     try {
       await ref.read(cartProvider.notifier).addItem(
             CartItem(
               productId: product.id,
               name: product.name,
-              unitAmount: product.unitAmountFor(variant),
+              unitAmount:
+                  selectedVariant?.unitAmount ?? product.unitAmountFor(variant),
               quantity: 1,
               currency: product.currency,
-              variant: variant,
+              variant: selectedVariant?.label ?? variant,
+              variantId: selectedVariant?.printifyVariantId,
             ),
           );
     } catch (error) {
@@ -135,7 +140,14 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
   }
 
   void _showProduct(StoreProduct product) {
-    var selectedSize = 'M';
+    String? selectedColor =
+        product.colorOptions.isEmpty ? null : product.colorOptions.first;
+    final initialSizes = product.sizeOptionsForColor(selectedColor);
+    String? selectedSize = initialSizes.contains('M')
+        ? 'M'
+        : initialSizes.isEmpty
+            ? null
+            : initialSizes.first;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -184,7 +196,17 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                         ),
                       ),
                       Text(
-                        _formatAmount(product.price),
+                        _formatAmount(
+                          product.variantMatrix.isEmpty
+                              ? product.price
+                              : product
+                                      .resolveVariant(
+                                        color: selectedColor,
+                                        size: selectedSize,
+                                      )
+                                      ?.unitAmount ??
+                                  product.price,
+                        ),
                         style: const TextStyle(
                           color: _acid,
                           fontSize: 20,
@@ -201,7 +223,78 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                       height: 1.5,
                     ),
                   ),
-                  if (product.isApparel) ...[
+                  if (product.variantMatrix.isNotEmpty) ...[
+                    if (product.colorOptions.length > 1) ...[
+                      const SizedBox(height: 22),
+                      const Text(
+                        'SELECT COLOR',
+                        style: TextStyle(
+                          color: Color(0xFF9BA69E),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        key: const ValueKey('quick-add-color'),
+                        value: selectedColor,
+                        items: [
+                          for (final color in product.colorOptions)
+                            DropdownMenuItem(value: color, child: Text(color)),
+                        ],
+                        onChanged: (value) => refresh(() {
+                          selectedColor = value;
+                          final sizes = product.sizeOptionsForColor(value);
+                          if (!sizes.contains(selectedSize)) {
+                            selectedSize = sizes.contains('M')
+                                ? 'M'
+                                : sizes.isEmpty
+                                    ? null
+                                    : sizes.first;
+                          }
+                        }),
+                      ),
+                    ],
+                    if (product.sizeOptionsForColor(selectedColor).length >
+                        1) ...[
+                      const SizedBox(height: 22),
+                      const Text(
+                        'SELECT SIZE',
+                        style: TextStyle(
+                          color: Color(0xFF9BA69E),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final size
+                              in product.sizeOptionsForColor(selectedColor))
+                            ChoiceChip(
+                              label: Text(size),
+                              selected: selectedSize == size,
+                              onSelected: (_) =>
+                                  refresh(() => selectedSize = size),
+                              selectedColor: _acid,
+                              backgroundColor: const Color(0xFF1A211D),
+                              labelStyle: TextStyle(
+                                color: selectedSize == size
+                                    ? _black
+                                    : Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              side: BorderSide(
+                                color: selectedSize == size ? _acid : _line,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ] else if (product.isApparel) ...[
                     const SizedBox(height: 22),
                     const Text(
                       'SELECT SIZE',
@@ -245,6 +338,10 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                         _addToBag(
                           product,
                           variant: product.isApparel ? selectedSize : null,
+                          selectedVariant: product.resolveVariant(
+                            color: selectedColor,
+                            size: selectedSize,
+                          ),
                         );
                       },
                       icon: const Icon(Icons.add_rounded),
@@ -533,8 +630,6 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
           'Could not open Stripe Checkout. Please retry.',
         );
       }
-    } on FirebaseFunctionsException catch (error) {
-      _showCheckoutError(error.message ?? 'Secure checkout could not start.');
     } on CheckoutFailure catch (error) {
       _showCheckoutError(error.message);
     } catch (error, stackTrace) {
@@ -575,8 +670,6 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
             'Stripe returned you to the store. Payment confirmation is still '
             'processing; your bag will stay saved until it is confirmed.';
       }
-    } on FirebaseFunctionsException catch (error) {
-      debugPrint('[twrxa] Could not verify checkout return: ${error.code}');
     } on CheckoutFailure catch (error) {
       debugPrint('[twrxa] Could not verify checkout return: $error');
     } catch (error, stackTrace) {
@@ -1221,10 +1314,12 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                   child: IconButton.filled(
                     key: ValueKey('quick-add-${product.id}'),
                     tooltip: 'Add ${product.name} to bag',
-                    onPressed: () => _addToBag(
-                      product,
-                      variant: product.quickAddVariant,
-                    ),
+                    onPressed: product.variantMatrix.isNotEmpty
+                        ? () => _showProduct(product)
+                        : () => _addToBag(
+                              product,
+                              variant: product.quickAddVariant,
+                            ),
                     style: IconButton.styleFrom(
                       backgroundColor: _acid,
                       foregroundColor: _black,

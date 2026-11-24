@@ -17,6 +17,7 @@ class StoreProduct {
     this.images = const [],
     this.printifyVariants = const {},
     this.printifyVariantPrices = const {},
+    this.variantMatrix = const [],
     this.active = true,
     this.fromFirestore = false,
   });
@@ -35,6 +36,7 @@ class StoreProduct {
   final List<String> images;
   final Map<String, int> printifyVariants;
   final Map<String, int> printifyVariantPrices;
+  final List<StoreProductVariant> variantMatrix;
   final bool active;
   final bool fromFirestore;
 
@@ -48,7 +50,62 @@ class StoreProduct {
         'POLO',
         'SHIRTS',
       }.contains(category) ||
-      printifyVariants.keys.any(_isSize);
+      printifyVariants.keys.any(_isSize) ||
+      variantMatrix.any((variant) => variant.size != null);
+
+  List<String> get colorOptions => variantMatrix
+      .map((variant) => variant.color)
+      .whereType<String>()
+      .toSet()
+      .toList()
+    ..sort();
+
+  List<String> get sizeOptions {
+    final sizes = variantMatrix
+        .map((variant) => variant.size)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+    sizes.sort((left, right) {
+      final leftRank = sizeOrder.indexOf(left.toUpperCase());
+      final rightRank = sizeOrder.indexOf(right.toUpperCase());
+      if (leftRank >= 0 && rightRank >= 0) return leftRank.compareTo(rightRank);
+      if (leftRank >= 0) return -1;
+      if (rightRank >= 0) return 1;
+      return left.compareTo(right);
+    });
+    return sizes;
+  }
+
+  List<String> sizeOptionsForColor(String? color) {
+    final sizes = variantMatrix
+        .where((variant) => color == null || variant.color == color)
+        .map((variant) => variant.size)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+    sizes.sort((left, right) {
+      final leftRank = sizeOrder.indexOf(left.toUpperCase());
+      final rightRank = sizeOrder.indexOf(right.toUpperCase());
+      if (leftRank >= 0 && rightRank >= 0) return leftRank.compareTo(rightRank);
+      if (leftRank >= 0) return -1;
+      if (rightRank >= 0) return 1;
+      return left.compareTo(right);
+    });
+    return sizes;
+  }
+
+  StoreProductVariant? resolveVariant({String? color, String? size}) {
+    for (final variant in variantMatrix) {
+      if ((color == null || variant.color == color) &&
+          (size == null || variant.size == size)) {
+        return variant;
+      }
+    }
+    return null;
+  }
 
   List<String> get variantKeys {
     final keys = printifyVariants.keys.toList();
@@ -102,6 +159,7 @@ class StoreProduct {
         : const <String>[];
     final variants = _readIntMap(data['printifyVariants']);
     final variantPrices = _readIntMap(data['printifyVariantPrices']);
+    final variantMatrix = _readVariantMatrix(data['variantMatrix']);
     final category = _inferCategory(
       data['category'] is String ? data['category'] as String : '',
       name,
@@ -136,9 +194,31 @@ class StoreProduct {
       images: images,
       printifyVariants: variants,
       printifyVariantPrices: variantPrices,
+      variantMatrix: variantMatrix,
       active: data['active'] == true,
       fromFirestore: true,
     );
+  }
+}
+
+class StoreProductVariant {
+  const StoreProductVariant({
+    required this.variantKey,
+    required this.printifyVariantId,
+    required this.unitAmount,
+    this.color,
+    this.size,
+  });
+
+  final String variantKey;
+  final int printifyVariantId;
+  final int unitAmount;
+  final String? color;
+  final String? size;
+
+  String? get label {
+    final values = [color, size].whereType<String>().toList();
+    return values.isEmpty ? null : values.join(' / ');
   }
 }
 
@@ -167,6 +247,28 @@ Map<String, int> _readIntMap(Object? value) {
       if (entry.key is String && entry.value is int && entry.value > 0)
         entry.key as String: entry.value as int,
   });
+}
+
+List<StoreProductVariant> _readVariantMatrix(Object? value) {
+  if (value is! List) return const [];
+  return List<StoreProductVariant>.unmodifiable([
+    for (final entry in value)
+      if (entry is Map &&
+          entry['variantKey'] is String &&
+          entry['printifyVariantId'] is int &&
+          (entry['printifyVariantId'] as int) > 0 &&
+          entry['unitAmount'] is int &&
+          (entry['unitAmount'] as int) > 0 &&
+          (entry['color'] == null || entry['color'] is String) &&
+          (entry['size'] == null || entry['size'] is String))
+        StoreProductVariant(
+          variantKey: entry['variantKey'] as String,
+          printifyVariantId: entry['printifyVariantId'] as int,
+          unitAmount: entry['unitAmount'] as int,
+          color: entry['color'] as String?,
+          size: entry['size'] as String?,
+        ),
+  ]);
 }
 
 String _inferCategory(
