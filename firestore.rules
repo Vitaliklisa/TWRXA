@@ -667,6 +667,16 @@ service cloud.firestore {
       allow delete: if signedIn() && userId == uid();
     }
 
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn() && resource.data.userId == uid();
+      allow write: if false;
+    }
+
     // ---------- users ----------
     //
     // A tiny public profile per account. It exists so an inviter can turn an

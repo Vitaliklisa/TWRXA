@@ -72,4 +72,60 @@ void main() {
     expect(find.text('\$48'), findsWidgets);
     expect(find.text('CHECKOUT'), findsOneWidget);
   });
+
+  testWidgets('the sort control orders the displayed product cards', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      await testScope(
+        MaterialApp(
+          theme: AppTheme.build(brightness: Brightness.dark),
+          home: const TwrxaShopScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final sortMenu = find.byKey(const ValueKey('product-sort'));
+    await tester.ensureVisible(sortMenu);
+    await tester.tap(sortMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Price: Low to High').last);
+    await tester.pumpAndSettle();
+
+    final cap = tester.getRect(
+      find.byKey(const ValueKey('product-card-logo-cap')),
+    );
+    final tee = tester.getRect(
+      find.byKey(const ValueKey('product-card-heavy-tee')),
+    );
+    expect(cap.left, lessThan(tee.left));
+  });
+
+  testWidgets('the drawer opens storefront pages and exact categories', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(await testScope(const TwrxaApp()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('store-drawer-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('T-shirts'), findsOneWidget);
+    expect(find.text('Pajamas'), findsOneWidget);
+    expect(find.text('Track Order'), findsOneWidget);
+    await tester.tap(find.text('FAQ'));
+    await tester.pumpAndSettle();
+    expect(find.text('THE QUICK ANSWERS.'), findsOneWidget);
+    await tester.tap(find.text('READ THE PUBLIC OFFER'));
+    await tester.pumpAndSettle();
+    expect(find.text('TERMS OF SALE'), findsOneWidget);
+  });
 }

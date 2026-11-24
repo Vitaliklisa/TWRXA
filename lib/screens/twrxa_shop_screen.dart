@@ -1,8 +1,15 @@
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/cart.dart';
+import '../core/product_sort.dart';
+import '../core/routes.dart';
 import '../providers/cart_provider.dart';
+import '../services/checkout_service.dart';
 
 const _acid = Color(0xFF39FF14);
 const _pink = Color(0xFFFF2D95);
@@ -25,18 +32,41 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
   String _category = 'ALL';
   String _query = '';
   bool _searchOpen = false;
+  bool _checkoutBusy = false;
+  ProductSortOrder _sortOrder = ProductSortOrder.newest;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_handleCheckoutReturn());
+    });
+  }
 
   List<_ShopProduct> get _visibleProducts {
-    return _products.where((product) {
-      final matchesCategory =
-          _category == 'ALL' || product.category == _category;
+    final filtered = _products.where((product) {
+      final matchesCategory = switch (_category) {
+        'ALL' => true,
+        'APPAREL' => product.isApparel,
+        'ACCESSORIES' => !product.isApparel,
+        'SHIRTS' =>
+          const {'T-SHIRTS', 'POLO', 'SHIRTS'}.contains(product.category),
+        _ => product.category == _category,
+      };
       final query = _query.trim().toLowerCase();
       final matchesQuery = query.isEmpty ||
           product.name.toLowerCase().contains(query) ||
           product.category.toLowerCase().contains(query) ||
           product.description.toLowerCase().contains(query);
       return matchesCategory && matchesQuery;
-    }).toList();
+    });
+    return sortProducts(
+      products: filtered,
+      order: _sortOrder,
+      createdAt: (product) => product.createdAt,
+      price: (product) => product.price,
+      id: (product) => product.id,
+    );
   }
 
   @override
@@ -65,7 +95,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
               name: product.name,
               unitAmount: product.price * 100,
               quantity: 1,
-              variant: product.category == 'APPAREL' ? size : null,
+              variant: product.isApparel ? size : null,
             ),
           );
     } catch (error) {
@@ -168,7 +198,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                       height: 1.5,
                     ),
                   ),
-                  if (product.category == 'APPAREL') ...[
+                  if (product.isApparel) ...[
                     const SizedBox(height: 22),
                     const Text(
                       'SELECT SIZE',
@@ -432,11 +462,22 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: () {
-                            Navigator.pop(sheetContext);
-                            _showCheckoutNotice();
-                          },
-                          child: const Text('CHECKOUT'),
+                          key: const ValueKey('start-checkout'),
+                          onPressed: _checkoutBusy
+                              ? null
+                              : () {
+                                  Navigator.pop(sheetContext);
+                                  unawaited(_startCheckout(cart));
+                                },
+                          child: _checkoutBusy
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('CHECKOUT'),
                         ),
                       ),
                     ],
@@ -473,19 +514,99 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     }
   }
 
-  void _showCheckoutNotice() {
-    showDialog<void>(
+  Future<void> _startCheckout(Cart cart) async {
+    setState(() => _checkoutBusy = true);
+    try {
+      final session = await CheckoutService().createCheckoutSession(cart);
+      final launched = await launchUrl(
+        session.url,
+        webOnlyWindowName: '_self',
+      );
+      if (!launched) {
+        throw const CheckoutFailure(
+          'Could not open Stripe Checkout. Please retry.',
+        );
+      }
+    } on FirebaseFunctionsException catch (error) {
+      _showCheckoutError(error.message ?? 'Secure checkout could not start.');
+    } on CheckoutFailure catch (error) {
+      _showCheckoutError(error.message);
+    } catch (error, stackTrace) {
+      debugPrint('[twrxa] Checkout failed: $error\n$stackTrace');
+      _showCheckoutError('Secure checkout could not start. Please retry.');
+    } finally {
+      if (mounted) setState(() => _checkoutBusy = false);
+    }
+  }
+
+  void _showCheckoutError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _handleCheckoutReturn() async {
+    final parameters = Uri.base.queryParameters;
+    final checkoutState = parameters['checkout'];
+    if (checkoutState == 'cancelled') {
+      _showCheckoutError('Checkout was cancelled. Your bag is still saved.');
+      return;
+    }
+    final orderId = parameters['order_id'];
+    if (checkoutState != 'success' || orderId == null) return;
+
+    var paymentMessage =
+        'Your order was received. Payment and shipping updates are verified '
+        'securely by the store.';
+    try {
+      final order = await CheckoutService().getOrderTracking(orderId);
+      if (order['paymentStatus'] == 'paid') {
+        await ref.read(cartProvider.notifier).clear();
+        paymentMessage = 'Payment confirmed. Your order is being prepared.';
+      } else {
+        paymentMessage =
+            'Stripe returned you to the store. Payment confirmation is still '
+            'processing; your bag will stay saved until it is confirmed.';
+      }
+    } on FirebaseFunctionsException catch (error) {
+      debugPrint('[twrxa] Could not verify checkout return: ${error.code}');
+    } on CheckoutFailure catch (error) {
+      debugPrint('[twrxa] Could not verify checkout return: $error');
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[twrxa] Could not verify checkout return: $error\n$stackTrace',
+      );
+    }
+    if (!mounted) return;
+    await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: _card,
-        title: const Text('CHECKOUT COMING SOON'),
-        content: const Text(
-          'This TWRXA shop preview has a working bag, but online payment is not set up yet. No order or payment has been submitted.',
+        title: const Text('ORDER UPDATE'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(paymentMessage),
+            const SizedBox(height: 12),
+            SelectableText('Order ID: $orderId'),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('GOT IT'),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.of(context).pushNamed(
+                Routes.trackOrder,
+                arguments: orderId,
+              );
+            },
+            child: const Text('TRACK ORDER'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('CLOSE'),
           ),
         ],
       ),
@@ -508,6 +629,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
             : 'BAG ${cart.itemCount}';
     return Scaffold(
       backgroundColor: _black,
+      drawer: _storeDrawer(),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -521,6 +643,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                   child: _header(
                     horizontal: horizontal,
                     wide: width > 720,
+                    compact: width < 430,
                     bagLabel: bagLabel,
                   ),
                 ),
@@ -635,12 +758,24 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
   Widget _header({
     required double horizontal,
     required bool wide,
+    required bool compact,
     required String bagLabel,
   }) {
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 16),
       child: Row(
         children: [
+          if (!wide) ...[
+            Builder(
+              builder: (context) => IconButton(
+                key: const ValueKey('store-drawer-button'),
+                tooltip: 'Open store menu',
+                onPressed: () => Scaffold.of(context).openDrawer(),
+                icon: const Icon(Icons.menu_rounded),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -676,12 +811,14 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                 onTap: () => _selectCategory('ACCESSORIES')),
             const SizedBox(width: 28),
           ],
-          IconButton(
-            tooltip: 'Search products',
-            onPressed: () => setState(() => _searchOpen = !_searchOpen),
-            icon: const Icon(Icons.search_rounded),
-          ),
-          const SizedBox(width: 4),
+          if (!compact) ...[
+            IconButton(
+              tooltip: 'Search products',
+              onPressed: () => setState(() => _searchOpen = !_searchOpen),
+              icon: const Icon(Icons.search_rounded),
+            ),
+            const SizedBox(width: 4),
+          ],
           OutlinedButton.icon(
             key: const ValueKey('cart-button'),
             onPressed: _showBag,
@@ -722,6 +859,72 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     setState(() => _category = category);
     _scrollToCollection();
   }
+
+  void _openStorePage(String route) => Navigator.of(context).pushNamed(route);
+
+  void _selectDrawerCategory(String category) {
+    Navigator.of(context).pop();
+    _selectCategory(category);
+  }
+
+  Widget _storeDrawer() => Drawer(
+        backgroundColor: _card,
+        child: SafeArea(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 18, 20, 20),
+                child: Text(
+                  'TWRXA',
+                  style: TextStyle(
+                    color: _acid,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+              for (final (label, category, icon) in const [
+                ('T-shirts', 'T-SHIRTS', Icons.checkroom_rounded),
+                ('Sweatshirts', 'HOODIES', Icons.layers_rounded),
+                ('Hoodies', 'HOODIES', Icons.layers_outlined),
+                ('Bags', 'BAGS', Icons.local_mall_outlined),
+                ('Polo', 'POLO', Icons.dry_cleaning_outlined),
+                ('Shirts', 'SHIRTS', Icons.checkroom_outlined),
+                ('Pajamas', 'PAJAMAS', Icons.nights_stay_outlined),
+                ('Hats', 'CAPS', Icons.sports_baseball_outlined),
+                ('Caps', 'CAPS', Icons.sports_baseball_rounded),
+              ])
+                ListTile(
+                  leading: Icon(icon, color: _acid),
+                  title: Text(label),
+                  onTap: () => _selectDrawerCategory(category),
+                ),
+              const Divider(color: _line),
+              ListTile(
+                leading: const Icon(Icons.help_outline_rounded, color: _acid),
+                title: const Text('FAQ'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openStorePage(Routes.faq);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.local_shipping_outlined,
+                  color: _acid,
+                ),
+                title: const Text('Track Order'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openStorePage(Routes.trackOrder);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
 
   Widget _hero({required double horizontal, required bool wide}) {
     final copy = Column(
@@ -872,6 +1075,43 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
             for (final category in categories) _categoryPill(category),
           ],
         ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const Text(
+              'SORT BY',
+              style: TextStyle(
+                color: Color(0xFF89948C),
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(width: 12),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<ProductSortOrder>(
+                key: const ValueKey('product-sort'),
+                value: _sortOrder,
+                dropdownColor: _card,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                items: [
+                  for (final order in ProductSortOrder.values)
+                    DropdownMenuItem(
+                      value: order,
+                      child: Text(order.label),
+                    ),
+                ],
+                onChanged: (order) {
+                  if (order != null) setState(() => _sortOrder = order);
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -898,6 +1138,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
 
   Widget _productCard(_ShopProduct product) {
     return Semantics(
+      key: ValueKey('product-card-${product.id}'),
       label: '${product.name}, \$${product.price}',
       button: true,
       child: Column(
@@ -1014,10 +1255,10 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
   Widget _footer(double horizontal) => Container(
         color: const Color(0xFF0D120F),
         padding: EdgeInsets.fromLTRB(horizontal, 36, horizontal, 32),
-        child: const Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'TWRXA',
               style: TextStyle(
                 color: _acid,
@@ -1026,8 +1267,8 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                 letterSpacing: 3,
               ),
             ),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               'NOT MADE TO BLEND IN.',
               style: TextStyle(
                 color: Colors.white70,
@@ -1036,10 +1277,47 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                 letterSpacing: 1.6,
               ),
             ),
-            SizedBox(height: 28),
-            Divider(color: _line),
-            SizedBox(height: 12),
-            Text(
+            const SizedBox(height: 22),
+            Wrap(
+              spacing: 10,
+              children: [
+                _socialIcon(
+                  tooltip: 'Instagram',
+                  icon: Icons.camera_alt_rounded,
+                ),
+                _socialIcon(
+                  tooltip: 'TikTok',
+                  icon: Icons.play_arrow_rounded,
+                ),
+                _socialIcon(
+                  tooltip: 'Social media',
+                  icon: Icons.alternate_email_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 2,
+              children: [
+                TextButton(
+                  onPressed: () => _openStorePage(Routes.faq),
+                  child: const Text('FAQ'),
+                ),
+                TextButton(
+                  onPressed: () => _openStorePage(Routes.trackOrder),
+                  child: const Text('TRACK ORDER'),
+                ),
+                TextButton(
+                  key: const ValueKey('public-offer-link'),
+                  onPressed: () => _openStorePage(Routes.publicOffer),
+                  child: const Text('PUBLIC OFFER'),
+                ),
+              ],
+            ),
+            const Divider(color: _line),
+            const SizedBox(height: 12),
+            const Text(
               '© 2026 TWRXA SUPPLY CO.  ·  MADE FOR THE OFF HOURS.',
               style: TextStyle(
                 color: Color(0xFF7E8981),
@@ -1048,6 +1326,23 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
               ),
             ),
           ],
+        ),
+      );
+
+  Widget _socialIcon({
+    required String tooltip,
+    required IconData icon,
+  }) =>
+      Tooltip(
+        message: tooltip,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1976D2),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Icon(icon, color: Colors.white, size: 19),
         ),
       );
 }
@@ -1312,6 +1607,7 @@ class _ShopProduct {
     required this.name,
     required this.category,
     required this.price,
+    required this.createdAt,
     required this.description,
     required this.tag,
     required this.artLabel,
@@ -1323,19 +1619,30 @@ class _ShopProduct {
   final String name;
   final String category;
   final int price;
+  final DateTime createdAt;
   final String description;
   final String tag;
   final String artLabel;
   final Color artColor;
   final IconData icon;
+
+  bool get isApparel => const {
+        'T-SHIRTS',
+        'HOODIES',
+        'OUTERWEAR',
+        'TROUSERS',
+        'POLO',
+        'SHIRTS'
+      }.contains(category);
 }
 
-const _products = <_ShopProduct>[
+final _products = <_ShopProduct>[
   _ShopProduct(
     id: 'heavy-tee',
     name: 'Heavyweight Tee',
-    category: 'APPAREL',
+    category: 'T-SHIRTS',
     price: 48,
+    createdAt: DateTime(2026, 7, 14),
     description:
         'An oversized, heavyweight daily uniform with a clean finish and room to move.',
     tag: 'BEST SELLER',
@@ -1346,8 +1653,9 @@ const _products = <_ShopProduct>[
   _ShopProduct(
     id: 'static-hoodie',
     name: 'Static Zip Hoodie',
-    category: 'APPAREL',
+    category: 'HOODIES',
     price: 98,
+    createdAt: DateTime(2026, 8, 20),
     description:
         'A substantial zip layer for cold platforms, late sets, and everywhere between.',
     tag: 'NEW',
@@ -1358,8 +1666,9 @@ const _products = <_ShopProduct>[
   _ShopProduct(
     id: 'signal-shell',
     name: 'Signal Shell',
-    category: 'APPAREL',
+    category: 'OUTERWEAR',
     price: 148,
+    createdAt: DateTime(2026, 4, 4),
     description:
         'Lightweight protection with utility details for unpredictable nights.',
     tag: 'LIMITED',
@@ -1370,37 +1679,40 @@ const _products = <_ShopProduct>[
   _ShopProduct(
     id: 'utility-cargo',
     name: 'Utility Cargo',
-    category: 'APPAREL',
+    category: 'TROUSERS',
     price: 88,
+    createdAt: DateTime(2026, 6, 14),
     description:
         'Easy-fit cargo trousers with considered pockets and an adjustable hem.',
     tag: 'RESTOCKED',
     artLabel: 'UTILITY / 04',
-    artColor: Color(0xFFB6FF55),
+    artColor: const Color(0xFFB6FF55),
     icon: Icons.inventory_2_outlined,
   ),
   _ShopProduct(
     id: 'crossbody',
     name: 'Night Shift Sling',
-    category: 'ACCESSORIES',
+    category: 'BAGS',
     price: 58,
+    createdAt: DateTime(2026, 5, 4),
     description:
         'A compact carry-all for the essentials you actually bring with you.',
     tag: 'DAILY CARRY',
     artLabel: 'ACCESSORY / 05',
-    artColor: Color(0xFFFF8B4A),
+    artColor: const Color(0xFFFF8B4A),
     icon: Icons.local_mall_outlined,
   ),
   _ShopProduct(
     id: 'logo-cap',
     name: 'No Signal Cap',
-    category: 'ACCESSORIES',
+    category: 'CAPS',
     price: 38,
+    createdAt: DateTime(2026, 9, 10),
     description:
         'Low-profile six-panel cap. Small mark up front, no noise anywhere else.',
     tag: 'NEW',
     artLabel: 'HEADWEAR / 06',
-    artColor: Color(0xFF41D9FF),
+    artColor: const Color(0xFF41D9FF),
     icon: Icons.sports_baseball_rounded,
   ),
 ];

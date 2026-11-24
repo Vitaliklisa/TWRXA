@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twrxa/core/cart.dart';
 import 'package:twrxa/services/cart_repository.dart';
+import 'package:twrxa/services/guest_cart_storage.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -77,4 +78,53 @@ void main() {
     expect(cart.itemCount, 2);
     expect(cart.items.map((item) => item.id).toSet(), hasLength(2));
   });
+
+  test('web guest storage persists in cookies and migrates to Firestore',
+      () async {
+    final cookies = _MemoryGuestCartStorage();
+    final webRepository = CartRepository(
+      firestore: firestore,
+      preferences: preferences,
+      guestCartStorage: cookies,
+    );
+    const item = CartItem(
+      productId: 'tee',
+      name: 'Heavyweight Tee',
+      unitAmount: 4800,
+      quantity: 1,
+    );
+
+    await webRepository.saveCart(
+      ownerId: null,
+      cart: Cart(items: const [item]),
+    );
+
+    expect(cookies.values, contains(guestCartStorageKey));
+    expect(preferences.getString(guestCartStorageKey), isNull);
+
+    final migrated = await webRepository.loadCart(ownerId: 'web-user');
+    expect(migrated.items.single.productId, 'tee');
+    expect(cookies.values, isEmpty);
+    expect((await webRepository.loadCart(ownerId: null)).isEmpty, isTrue);
+  });
+}
+
+class _MemoryGuestCartStorage implements GuestCartStorage {
+  final values = <String, String>{};
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  String? read(String key) => values[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> remove(String key) async {
+    values.remove(key);
+  }
 }

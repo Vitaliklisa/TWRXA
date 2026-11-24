@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'core/theme.dart';
+import 'core/routes.dart';
 import 'firebase_options.dart';
+import 'screens/faq_screen.dart';
+import 'screens/public_offer_screen.dart';
 import 'screens/twrxa_shop_screen.dart';
+import 'screens/track_order_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,5 +29,13 @@ class TwrxaApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.build(brightness: Brightness.dark),
         home: const TwrxaShopScreen(),
+        routes: {
+          Routes.trackOrder: (context) => TrackOrderScreen(
+                initialOrderId:
+                    ModalRoute.of(context)?.settings.arguments as String?,
+              ),
+          Routes.faq: (_) => const FaqScreen(),
+          Routes.publicOffer: (_) => const PublicOfferScreen(),
+        },
       );
 }

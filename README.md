@@ -8,13 +8,19 @@ purple, and hot-pink accents.
 
 - Browse a sample apparel and accessories drop without signing in.
 - Filter by category and search product names or descriptions.
+- Sort the current catalog by newest, oldest, and price in either direction.
 - Open product details, choose a size, and add items to the bag.
-- Adjust quantities and review the subtotal in the bag.
+- Persist guest carts in browser cookies or native SharedPreferences; signed-in
+  carts are synchronized to Firestore.
+- Adjust quantities, review the subtotal, and open secure Stripe Checkout.
+- Track owner-scoped Printify orders, browse the FAQ, and read the Public Offer.
 - Use the responsive layout on desktop and mobile screens.
 
-The catalog, prices, and product artwork are demo content. The bag is held in
-memory for the current session. Checkout is intentionally a notice-only demo:
-there is no payment processing, order submission, or customer data collection.
+The local catalog, prices, and product artwork are sample content. Secure
+checkout requires the server-side product/Printify mappings, Stripe Connect
+account, Firebase secrets, billing plan, and provider webhooks described in
+[docs/STORE_SETUP.md](docs/STORE_SETUP.md). Do not accept live orders until the
+Public Offer placeholders are completed and reviewed.
 
 ## Run locally
 
@@ -42,8 +48,10 @@ flutter build web --release
 - Web title, icon, and install metadata: `web/index.html` and `web/manifest.json`
 - Shared icon/splash source: `scripts/generate-flutter-icons.mjs`
 
-The current app launch is a public shop experience and does not require
-Firebase configuration or an account.
+Browsing does not require an account. Checkout creates a Firebase anonymous
+session and requires the TWRXA Firebase configuration and server setup in
+[docs/STORE_SETUP.md](docs/STORE_SETUP.md). The checked-in Android and iOS
+Firebase app options still target the prior `datedawn` project.
 
 Regenerate the shared artwork and platform assets with:
 

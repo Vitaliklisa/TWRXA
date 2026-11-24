@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/cart.dart';
+import 'guest_cart_storage.dart';
 
 const guestCartStorageKey = 'twrxa.guest_cart.v1';
 
@@ -12,13 +13,16 @@ class CartRepository {
   CartRepository({
     FirebaseFirestore? firestore,
     SharedPreferences? preferences,
+    GuestCartStorage? guestCartStorage,
     Uuid? uuid,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _preferences = preferences,
+        _guestCartStorage = guestCartStorage ?? createGuestCartStorage(),
         _uuid = uuid ?? const Uuid();
 
   final FirebaseFirestore _firestore;
   final SharedPreferences? _preferences;
+  final GuestCartStorage _guestCartStorage;
   final Uuid _uuid;
 
   Future<SharedPreferences> get _prefs async =>
@@ -30,12 +34,11 @@ class CartRepository {
       return guest?.cart ?? Cart.empty;
     }
 
-    final preferences = await _prefs;
-    final guest = await _readGuestCart(preferences);
+    final guest = await _readGuestCart();
     final cartReference = _firestore.collection('carts').doc(ownerId);
 
     if (guest == null || guest.cart.isEmpty) {
-      if (guest != null) await _removeGuestCart(preferences);
+      if (guest != null) await _removeGuestCart();
       final snapshot = await cartReference.get();
       return snapshot.exists ? Cart.fromJson(snapshot.data()!) : Cart.empty;
     }
@@ -59,7 +62,7 @@ class CartRepository {
       return next;
     });
 
-    await _removeGuestCart(preferences);
+    await _removeGuestCart();
     return merged;
   }
 
@@ -68,17 +71,19 @@ class CartRepository {
     required Cart cart,
   }) async {
     if (ownerId == null) {
-      final preferences = await _prefs;
-      final previous = await _readGuestCart(preferences);
+      final previous = await _readGuestCart();
       final guestId = previous?.id ?? _uuid.v4();
-      final saved = await preferences.setString(
-        guestCartStorageKey,
-        jsonEncode({
-          ...cart.toJson(),
-          'guestCartId': guestId,
-        }),
-      );
-      if (!saved) throw StateError('Could not save the guest cart locally.');
+      final value = jsonEncode({
+        ...cart.toJson(),
+        'guestCartId': guestId,
+      });
+      if (_guestCartStorage.isSupported) {
+        await _guestCartStorage.write(guestCartStorageKey, value);
+      } else {
+        final saved =
+            await (await _prefs).setString(guestCartStorageKey, value);
+        if (!saved) throw StateError('Could not save the guest cart locally.');
+      }
       return;
     }
 
@@ -91,8 +96,10 @@ class CartRepository {
     );
   }
 
-  Future<_GuestCart?> _readGuestCart([SharedPreferences? preferences]) async {
-    final value = (preferences ?? await _prefs).getString(guestCartStorageKey);
+  Future<_GuestCart?> _readGuestCart() async {
+    final value = _guestCartStorage.isSupported
+        ? _guestCartStorage.read(guestCartStorageKey)
+        : (await _prefs).getString(guestCartStorageKey);
     if (value == null) return null;
 
     final decoded = jsonDecode(value);
@@ -107,8 +114,12 @@ class CartRepository {
     return _GuestCart(id, Cart.fromJson(data));
   }
 
-  Future<void> _removeGuestCart(SharedPreferences preferences) async {
-    final removed = await preferences.remove(guestCartStorageKey);
+  Future<void> _removeGuestCart() async {
+    if (_guestCartStorage.isSupported) {
+      await _guestCartStorage.remove(guestCartStorageKey);
+      return;
+    }
+    final removed = await (await _prefs).remove(guestCartStorageKey);
     if (!removed) throw StateError('Could not clear the migrated guest cart.');
   }
 }

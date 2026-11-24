@@ -60,6 +60,11 @@ class Routes {
   /// navigator, driven by [legalDocumentProvider] — see `openLegalPage`.
   static const privacy = '/privacy';
   static const terms = '/terms';
+
+  /// Public storefront pages, also exposed as shareable browser paths.
+  static const trackOrder = '/track-order';
+  static const faq = '/faq';
+  static const publicOffer = '/public-offer';
 }
 
 /// Which legal document, if any, is open over the current page.
