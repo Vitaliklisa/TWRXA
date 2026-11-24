@@ -17,10 +17,12 @@ purple, and hot-pink accents.
 - Use the responsive layout on desktop and mobile screens.
 
 The local catalog, prices, and product artwork are sample content. Secure
-checkout requires the server-side product/Printify mappings, Stripe Connect
-account, Firebase secrets, billing plan, and provider webhooks described in
-[docs/STORE_SETUP.md](docs/STORE_SETUP.md). Do not accept live orders until the
-Public Offer placeholders are completed and reviewed.
+checkout requires the Vercel backend environment, server-side
+product/Printify mappings, Stripe Connect account, and provider webhooks
+described in [docs/BACKEND_DEPLOYMENT.md](docs/BACKEND_DEPLOYMENT.md). Firebase
+Auth and Firestore remain the identity and catalog/order store; checkout and
+fulfillment run on Vercel. Do not accept live orders until the Public Offer
+placeholders are completed and reviewed.
 
 ## Run locally
 
@@ -49,9 +51,10 @@ flutter build web --release
 - Shared icon/splash source: `scripts/generate-flutter-icons.mjs`
 
 Browsing does not require an account. Checkout creates a Firebase anonymous
-session and requires the TWRXA Firebase configuration and server setup in
-[docs/STORE_SETUP.md](docs/STORE_SETUP.md). The checked-in Android and iOS
-Firebase app options still target the prior `datedawn` project.
+session and requires the TWRXA Firebase configuration and Vercel server setup
+in [docs/BACKEND_DEPLOYMENT.md](docs/BACKEND_DEPLOYMENT.md). The checked-in
+Android and iOS Firebase app options still target the prior `datedawn`
+project.
 
 Regenerate the shared artwork and platform assets with:
 

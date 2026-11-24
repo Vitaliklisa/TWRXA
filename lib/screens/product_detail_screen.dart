@@ -32,6 +32,8 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   String? _selectedVariant;
+  String? _selectedColor;
+  String? _selectedSize;
   int _quantity = 1;
   int _activeImage = 0;
   bool _addingToCart = false;
@@ -211,8 +213,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   Widget _productInformation(StoreProduct product) {
     final keys = product.variantKeys.where((key) => key != 'default').toList();
     final variant = _resolvedVariant(product);
-    final unitAmount = product.unitAmountFor(variant);
-    final hasVariants = product.printifyVariants.isNotEmpty;
+    final selectedMatrixVariant = _resolvedMatrixVariant(product);
+    final unitAmount =
+        selectedMatrixVariant?.unitAmount ?? product.unitAmountFor(variant);
+    final hasVariants =
+        product.variantMatrix.isNotEmpty || product.printifyVariants.isNotEmpty;
     final purchasable = product.active && hasVariants;
     final onlySizeKeys = keys.isNotEmpty &&
         keys.every((key) => const {
@@ -273,7 +278,83 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               : product.description,
           style: const TextStyle(color: _muted, height: 1.65),
         ),
-        if (keys.isNotEmpty) ...[
+        if (product.variantMatrix.isNotEmpty) ...[
+          if (product.colorOptions.length > 1) ...[
+            const SizedBox(height: 32),
+            const Text(
+              'SELECT COLOR',
+              style: TextStyle(
+                color: _muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: const ValueKey('product-color'),
+              value: _resolvedColor(product),
+              items: [
+                for (final color in product.colorOptions)
+                  DropdownMenuItem(value: color, child: Text(color)),
+              ],
+              onChanged: purchasable
+                  ? (value) => setState(() {
+                        _selectedColor = value;
+                        final sizes = product.sizeOptionsForColor(value);
+                        if (!sizes.contains(_selectedSize)) {
+                          _selectedSize = sizes.contains('M')
+                              ? 'M'
+                              : sizes.isEmpty
+                                  ? null
+                                  : sizes.first;
+                        }
+                      })
+                  : null,
+            ),
+          ],
+          if (product.sizeOptionsForColor(_resolvedColor(product)).length >
+              1) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'SELECT SIZE',
+              style: TextStyle(
+                color: _muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 9,
+              runSpacing: 9,
+              children: [
+                for (final size
+                    in product.sizeOptionsForColor(_resolvedColor(product)))
+                  ChoiceChip(
+                    key: ValueKey('product-size-$size'),
+                    label: Text(size),
+                    selected: _resolvedSize(product) == size,
+                    onSelected: purchasable
+                        ? (_) => setState(() => _selectedSize = size)
+                        : null,
+                    selectedColor: _accent,
+                    backgroundColor: const Color(0xFF1A211D),
+                    side: BorderSide(
+                      color: _resolvedSize(product) == size ? _accent : _line,
+                    ),
+                    labelStyle: TextStyle(
+                      color: _resolvedSize(product) == size
+                          ? _background
+                          : Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ] else if (keys.isNotEmpty) ...[
           const SizedBox(height: 32),
           Text(
             onlySizeKeys ? 'SELECT SIZE' : 'SELECT OPTION',
@@ -353,7 +434,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             key: const ValueKey('product-add-to-cart'),
             onPressed: !purchasable || _addingToCart
                 ? null
-                : () => _addToCart(product, variant),
+                : () => _addToCart(product, variant, selectedMatrixVariant),
             style: FilledButton.styleFrom(
               backgroundColor: _accent,
               foregroundColor: _background,
@@ -410,21 +491,49 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     return keys.firstWhere((key) => key != 'default', orElse: () => keys.first);
   }
 
+  String? _resolvedColor(StoreProduct product) {
+    final colors = product.colorOptions;
+    if (colors.isEmpty) return null;
+    return colors.contains(_selectedColor) ? _selectedColor : colors.first;
+  }
+
+  String? _resolvedSize(StoreProduct product) {
+    final sizes = product.sizeOptionsForColor(_resolvedColor(product));
+    if (sizes.isEmpty) return null;
+    if (sizes.contains(_selectedSize)) return _selectedSize;
+    return sizes.contains('M') ? 'M' : sizes.first;
+  }
+
+  StoreProductVariant? _resolvedMatrixVariant(StoreProduct product) {
+    if (product.variantMatrix.isEmpty) return null;
+    return product.resolveVariant(
+      color: _resolvedColor(product),
+      size: _resolvedSize(product),
+    );
+  }
+
   String _formatPrice(StoreProduct product, int amount) =>
       NumberFormat.simpleCurrency(name: product.currency.toUpperCase())
           .format(amount / 100);
 
-  Future<void> _addToCart(StoreProduct product, String? variant) async {
+  Future<void> _addToCart(
+    StoreProduct product,
+    String? variant,
+    StoreProductVariant? selectedMatrixVariant,
+  ) async {
     setState(() => _addingToCart = true);
     try {
       await ref.read(cartProvider.notifier).addItem(
             CartItem(
               productId: product.id,
               name: product.name,
-              unitAmount: product.unitAmountFor(variant),
+              unitAmount: selectedMatrixVariant?.unitAmount ??
+                  product.unitAmountFor(variant),
               quantity: _quantity,
               currency: product.currency,
-              variant: variant == 'default' ? null : variant,
+              variant: selectedMatrixVariant?.label ??
+                  (variant == 'default' ? null : variant),
+              variantId: selectedMatrixVariant?.printifyVariantId,
             ),
           );
       if (!mounted) return;

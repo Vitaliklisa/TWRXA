@@ -1,4 +1,4 @@
-// Date Dawn - backend health check.
+// TWRXA - Firebase connectivity check.
 //
 // Tells you, in plain language, whether the backend the app needs is actually
 // reachable. Run it from the project root:
@@ -8,8 +8,8 @@
 // It only performs READ probes with the public keys that already ship in the
 // app; it never writes anything.
 
-const FIREBASE_API_KEY = 'AIzaSyA3nS579jUK46wfNtUsYq4qFui8bBiRsws';
-const FIREBASE_PROJECT = 'datedawn';
+const FIREBASE_API_KEY = 'AIzaSyCHjO5zVnSoxEnrn4htvXwNyTd-_CUb4cY';
+const FIREBASE_PROJECT = 'twrxa-shop';
 
 const results = [];
 
@@ -44,8 +44,7 @@ async function probe(url, options = {}) {
 }
 
 // --- Cloud Firestore --------------------------------------------------------
-// Countdowns, circles, invitations, notes, the notification inbox and theme
-// sync all live here. If this fails, nothing the user creates is saved.
+// Products are public in Firestore and power the Vercel storefront.
 //
 // Note there are no collections to create by hand: Firestore creates a
 // collection the first time a document is written into it, and the rules file
@@ -53,22 +52,21 @@ async function probe(url, options = {}) {
 {
   const url =
     `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}` +
-    `/databases/(default)/documents/events?key=${FIREBASE_API_KEY}`;
+    `/databases/(default)/documents/products?key=${FIREBASE_API_KEY}`;
   const { status, text } = await probe(url);
   if (status === 403 && text.includes('SERVICE_DISABLED')) {
     record(
       'Cloud Firestore',
       false,
-      'DISABLED. Nothing is saved. Enable it at:\n' +
-        '    https://console.firebase.google.com/project/datedawn/firestore\n' +
-        '    Create database > Production mode > pick a region.',
+      'DISABLED. Enable Firestore at:\n' +
+      '    https://console.firebase.google.com/project/twrxa-shop/firestore',
     );
   } else if (status === 404) {
     record(
       'Cloud Firestore',
       false,
       'No database created yet. Create one at:\n' +
-        '    https://console.firebase.google.com/project/datedawn/firestore',
+      '    https://console.firebase.google.com/project/twrxa-shop/firestore',
     );
   } else if (status === 403 || status === 401) {
     // A permission error is EXPECTED for an unauthenticated read once the
@@ -82,14 +80,10 @@ async function probe(url, options = {}) {
 }
 
 // --- Cloud Storage ----------------------------------------------------------
-// Deliberately NOT probed. Date Dawn ships without profile pictures: Cloud
-// Storage now requires the Blaze plan, so no bucket is expected to exist and a
-// missing one is the intended state, not a fault. Reporting it here would print
-// a permanent [FAIL] line and, worse, exit non-zero, which would make a healthy
-// backend look broken. There is nothing to check until avatars come back.
+// Cloud Storage is not part of the TWRXA product catalog integration.
 
 // --- Report -----------------------------------------------------------------
-console.log('\nDate Dawn - backend health check\n' + '='.repeat(44));
+console.log('\nTWRXA - Firebase connectivity check\n' + '='.repeat(44));
 let failed = 0;
 for (const { name, ok, detail } of results) {
   console.log(`\n${ok ? '[OK]  ' : '[FAIL]'} ${name}`);

@@ -16,7 +16,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
 
-  # Firebase - auth and shared data. Cloud Functions require Blaze billing.
+  # Firebase - auth and shared data. Commerce APIs run on Vercel.
   # No `firebase_storage`: Cloud Storage needs the Blaze plan, and Date Dawn
   # launches without profile pictures. See "Avatars" in README.md.
   firebase_core: ^4.15.0
@@ -44,7 +44,6 @@ dependencies:
 
   cupertino_icons: ^2.0.0
   http: ^1.6.0
-  cloud_functions: ^6.5.1
   web: ^1.1.2
   carousel_slider: ^5.1.2
   smooth_page_indicator: ^3.0.0

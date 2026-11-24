@@ -1,5 +1,7 @@
 .neon
-.env.local
+.env
+.env.*
+!.env.example
 node_modules/
 # --- Flutter / Dart ---
 .dart_tool/

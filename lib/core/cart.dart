@@ -9,6 +9,7 @@ class CartItem {
     required this.quantity,
     this.currency = 'usd',
     this.variant,
+    this.variantId,
   });
 
   final String productId;
@@ -17,8 +18,9 @@ class CartItem {
   final int quantity;
   final String currency;
   final String? variant;
+  final int? variantId;
 
-  String get id => '$productId|${variant ?? ''}';
+  String get id => '$productId|${variantId ?? variant ?? ''}';
 
   CartItem withQuantity(int value) => CartItem(
         productId: productId,
@@ -27,6 +29,7 @@ class CartItem {
         quantity: value,
         currency: currency,
         variant: variant,
+        variantId: variantId,
       );
 
   Map<String, Object?> toJson() => {
@@ -36,6 +39,7 @@ class CartItem {
         'quantity': quantity,
         'currency': currency,
         'variant': variant,
+        'variantId': variantId,
       };
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
@@ -45,6 +49,7 @@ class CartItem {
     final quantity = json['quantity'];
     final currency = json['currency'] ?? 'usd';
     final variant = json['variant'];
+    final variantId = json['variantId'];
     if (productId is! String ||
         productId.isEmpty ||
         name is! String ||
@@ -54,7 +59,8 @@ class CartItem {
         quantity is! int ||
         quantity < 1 ||
         currency is! String ||
-        (variant != null && variant is! String)) {
+        (variant != null && variant is! String) ||
+        (variantId != null && (variantId is! int || variantId < 1))) {
       throw const FormatException('Invalid cart item data.');
     }
     return CartItem(
@@ -64,6 +70,7 @@ class CartItem {
       quantity: quantity,
       currency: currency,
       variant: variant as String?,
+      variantId: variantId as int?,
     );
   }
 }

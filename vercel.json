@@ -7,11 +7,17 @@
   "rewrites": [
     {
       "source": "/__/auth/(.*)",
-      "destination": "https://datedawn.firebaseapp.com/__/auth/$1"
+      "destination": "https://twrxa-shop.firebaseapp.com/__/auth/$1"
     },
     {
       "source": "/(.*)",
       "destination": "/"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync-products",
+      "schedule": "0 9 * * *"
     }
   ],
   "headers": [

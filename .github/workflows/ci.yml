@@ -71,6 +71,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+
+      - name: Install Vercel API dependencies
+        run: npm ci
+
+      - name: Test commerce API
+        run: npm run test:commerce
+
+      - name: Type-check Vercel API
+        run: npm run typecheck
 
       - uses: subosito/flutter-action@v2
         with:
