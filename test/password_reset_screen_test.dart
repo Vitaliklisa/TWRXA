@@ -42,7 +42,7 @@ void main() {
         child: MaterialApp(
           home: PasswordResetScreen(
             actionUri: Uri.parse(
-              'https://datedawn.firebaseapp.com/__/auth/action'
+              'https://twrxa-shop.firebaseapp.com/__/auth/action'
               '?mode=resetPassword&oobCode=one-time-code',
             ),
           ),
@@ -75,7 +75,7 @@ void main() {
     final auth = _TestAuthService();
     final nestedLink = Uri(
       scheme: 'https',
-      host: 'datedawn.firebaseapp.com',
+      host: 'twrxa-shop.firebaseapp.com',
       path: '/__/auth/action',
       queryParameters: {'oobCode': 'nested-code'},
     );

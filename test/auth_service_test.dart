@@ -106,7 +106,8 @@ void main() {
       () => user.reload(),
       () => user.sendEmailVerification(any()),
     ]);
-    expect(sentSettings!.url, 'https://date-dawn.vercel.app/verify-email');
+    expect(
+        sentSettings!.url, 'https://twrxa-shop.firebaseapp.com/verify-email');
     expect(sentSettings!.handleCodeInApp, isTrue);
     expect(sentSettings!.androidPackageName, 'com.datedawn.app');
     expect(sentSettings!.androidInstallApp, isTrue);
@@ -126,7 +127,8 @@ void main() {
 
     await AuthService(auth: auth).sendEmailVerification();
 
-    expect(sentSettings!.url, 'https://date-dawn.vercel.app/verify-email');
+    expect(
+        sentSettings!.url, 'https://twrxa-shop.firebaseapp.com/verify-email');
     expect(sentSettings!.androidPackageName, 'com.datedawn.app');
     expect(sentSettings!.androidInstallApp, isTrue);
     expect(sentSettings!.androidMinimumVersion, '12');
@@ -180,7 +182,8 @@ void main() {
         actionCodeSettings: any(named: 'actionCodeSettings'),
       ),
     ).called(1);
-    expect(sentSettings!.url, 'https://date-dawn.vercel.app/reset-password');
+    expect(
+        sentSettings!.url, 'https://twrxa-shop.firebaseapp.com/reset-password');
     expect(sentSettings!.handleCodeInApp, isTrue);
     expect(sentSettings!.androidPackageName, 'com.datedawn.app');
     expect(sentSettings!.androidInstallApp, isTrue);
