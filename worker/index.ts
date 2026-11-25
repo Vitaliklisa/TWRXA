@@ -48,9 +48,10 @@ type WorkerExecutionContext = {
   waitUntil(promise: Promise<unknown>): void;
 };
 
-app.use("*", async (context, next) => {
-  const origin = context.req.header("origin");
-  const allowedOrigins = [context.env.APP_BASE_URL, context.env.APP_ALLOWED_ORIGINS ?? ""]
+function allowedOrigin(request: Request, env: Env) {
+  const origin = request.headers.get("origin");
+  if (!origin) return null;
+  const allowedOrigins = [env.APP_BASE_URL, env.APP_ALLOWED_ORIGINS ?? ""]
     .join(",")
     .split(",")
     .map((value) => {
@@ -61,39 +62,58 @@ app.use("*", async (context, next) => {
       }
     })
     .filter(Boolean);
-  const allowedOrigin = origin && allowedOrigins.includes(origin) ? origin : null;
-  if (allowedOrigin) {
-    context.header("Access-Control-Allow-Origin", origin);
-    context.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    context.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    context.header("Access-Control-Max-Age", "600");
-    context.header("Vary", "Origin");
-  }
+  return allowedOrigins.includes(origin) ? origin : null;
+}
+
+function withCorsHeaders(response: Response, request: Request, env: Env) {
+  const origin = allowedOrigin(request, env);
+  if (!origin) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  headers.set("Access-Control-Max-Age", "600");
+  headers.set("Vary", "Origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+app.use("*", async (context, next) => {
+  const origin = context.req.header("origin");
+  const requestOrigin = allowedOrigin(context.req.raw, context.env);
   if (context.req.method === "OPTIONS") {
-    if (!origin || !allowedOrigin) {
+    if (!origin || !requestOrigin) {
       return jsonResponse(403, { error: "origin_not_allowed", message: "Origin is not allowed." });
     }
-    return new Response(null, {
+    return withCorsHeaders(new Response(null, {
       status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Max-Age": "600",
-        Vary: "Origin",
-      },
-    });
+    }), context.req.raw, context.env);
   }
   await next();
+  return withCorsHeaders(context.res, context.req.raw, context.env);
 });
 
-async function safeRoute(context: string, operation: () => Promise<Response>) {
+async function safeRoute(
+  context: string,
+  request: Request,
+  env: Env,
+  operation: () => Promise<Response>,
+) {
   try {
     return await operation();
   } catch (error) {
-    return errorResponse(error, context);
+    console.error(`[${context}] handler failed`, error);
+    return withCorsHeaders(errorResponse(error, context), request, env);
   }
 }
+
+app.onError((error, context) => {
+  console.error("[worker] Unhandled request error", error);
+  return withCorsHeaders(errorResponse(error, "worker"), context.req.raw, context.env);
+});
 
 function authHeader(request: Request) {
   return request.headers.get("authorization") ?? "";
@@ -127,8 +147,8 @@ function asDate(value: unknown) {
   return null;
 }
 
-function health(env: Env) {
-  return safeRoute("health", async () => {
+function health(request: Request, env: Env) {
+  return safeRoute("health", request, env, async () => {
     const account = (() => {
       try {
         const parsed = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON) as {
@@ -255,6 +275,7 @@ async function checkout(request: Request, env: Env) {
     });
     return jsonResponse(201, { orderId, url: session.url });
   } catch (error) {
+    console.error("[checkout-session] Stripe Checkout session creation failed", error);
     await updateDoc(env, `orders/${orderId}`, {
       status: "checkout_error",
       updatedAt: new Date(),
@@ -679,23 +700,23 @@ async function scheduledSync(env: Env) {
 }
 
 function checkoutHandler(request: Request, env: Env) {
-  return safeRoute("checkout-session", () => checkout(request, env));
+  return safeRoute("checkout-session", request, env, () => checkout(request, env));
 }
 
 function stripeWebhookHandler(request: Request, env: Env) {
-  return safeRoute("stripe-webhook", () => stripeWebhook(request, env));
+  return safeRoute("stripe-webhook", request, env, () => stripeWebhook(request, env));
 }
 
 function printifyWebhookHandler(request: Request, env: Env) {
-  return safeRoute("printify-webhook", () => printifyWebhook(request, env));
+  return safeRoute("printify-webhook", request, env, () => printifyWebhook(request, env));
 }
 
 function syncProductsHandler(request: Request, env: Env) {
-  return safeRoute("sync-products", () => syncProducts(request, env));
+  return safeRoute("sync-products", request, env, () => syncProducts(request, env));
 }
 
 function orderTrackingHandler(request: Request, env: Env) {
-  return safeRoute("order-tracking", async () => {
+  return safeRoute("order-tracking", request, env, async () => {
     if (request.method !== "GET") return methodNotAllowed("GET");
     const user = await requireFirebaseUser(request, env);
     const orderId = new URL(request.url).searchParams.get("orderId") ?? "";
@@ -723,7 +744,7 @@ function orderTrackingHandler(request: Request, env: Env) {
   });
 }
 
-app.get("/api/health", (context) => health(context.env));
+app.get("/api/health", (context) => health(context.req.raw, context.env));
 app.post("/api/checkout-session", (context) => checkoutHandler(context.req.raw, context.env));
 app.post("/api/create-checkout-session", (context) =>
   checkoutHandler(context.req.raw, context.env),
@@ -733,7 +754,13 @@ app.all("/api/printify-webhook", (context) => printifyWebhookHandler(context.req
 app.all("/api/sync-products", (context) => syncProductsHandler(context.req.raw, context.env));
 app.all("/api/order-tracking", (context) => orderTrackingHandler(context.req.raw, context.env));
 
-app.notFound(() => jsonResponse(404, { error: "not_found", message: "Endpoint not found." }));
+app.notFound((context) =>
+  withCorsHeaders(
+    jsonResponse(404, { error: "not_found", message: "Endpoint not found." }),
+    context.req.raw,
+    context.env,
+  ),
+);
 
 export default {
   fetch: (request: Request, env: Env) => app.fetch(request, env),

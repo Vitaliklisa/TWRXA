@@ -41,7 +41,7 @@ export function normalizeCartItems(value: unknown): CartLineInput[] {
       productId.includes("/") ||
       !Number.isInteger(quantity) ||
       (quantity as number) < 1 ||
-      (quantity as number) > 10 ||
+      (quantity as number) > 20 ||
       (variant !== undefined &&
         variant !== null &&
         (typeof variant !== "string" || variant.length > 160)) ||

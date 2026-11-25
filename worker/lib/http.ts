@@ -75,7 +75,13 @@ export function errorResponse(error: unknown, context: string) {
       status: error.status,
       code: error.code,
     });
-    return jsonResponse(error.status, { error: error.code, message: error.message });
+    return jsonResponse(error.status, {
+      error: error.code,
+      message:
+        error.status >= 500
+          ? "The request could not be completed. Please try again."
+          : error.message,
+    });
   }
   console.error(`[${context}] request failed`, {
     error: error instanceof Error ? error.name : "UnknownError",

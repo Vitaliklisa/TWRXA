@@ -149,7 +149,10 @@ function makeEnv(): Env {
   };
 }
 
-function mockExternalServices(initialDocuments: Map<string, Record<string, unknown>> = new Map()) {
+function mockExternalServices(
+  initialDocuments: Map<string, Record<string, unknown>> = new Map(),
+  options: { throwOnStripe?: boolean } = {},
+) {
   const documents = new Map(initialDocuments);
   const writes = { orders: 0, events: 0 };
   const orderRequestBodies: Array<Record<string, unknown>> = [];
@@ -175,6 +178,7 @@ function mockExternalServices(initialDocuments: Map<string, Record<string, unkno
       });
     }
     if (url.hostname === "api.stripe.com") {
+      if (options.throwOnStripe) throw new Error("Stripe test failure");
       stripeForms.push(new URLSearchParams(String(init.body ?? "")));
       return jsonResponse({
         id: "cs_test_worker123",
@@ -456,7 +460,7 @@ describe("Cloudflare commerce API", () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          items: [{ productId: "printify-shirt", quantity: 1, variantId: 104 }],
+          items: [{ productId: "printify-shirt", quantity: 20, variantId: 104 }],
         }),
       }),
       makeEnv(),
@@ -472,8 +476,113 @@ describe("Cloudflare commerce API", () => {
     expect(body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_worker123");
     expect(body.orderId).toMatch(/^[A-Za-z0-9_-]{10,64}$/);
     expect(printifyItems[0].variant_id).toBe(104);
+    expect(printifyItems[0].quantity).toBe(20);
     expect(services.stripeForms[0].get("line_items[0][price_data][unit_amount]")).toBe("2800");
     expect(services.stripeForms[0].get("metadata[uid]")).toBe("firebase-user-123");
+  });
+
+  it("returns an allowlisted CORS header and detailed logs for variant errors", async () => {
+    const docs = new Map<string, Record<string, unknown>>([
+      [
+        "products/printify-shirt",
+        document("products/printify-shirt", {
+          active: true,
+          name: "Test Shirt",
+          price: 2500,
+          currency: "usd",
+          printifyProductId: "printify-shirt",
+          variantMatrix: [
+            {
+              color: "White",
+              size: "M",
+              printifyVariantId: 104,
+              unitAmount: 2800,
+            },
+          ],
+        }),
+      ],
+    ]);
+    mockExternalServices(docs);
+    const token = await createFirebaseToken();
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await worker.fetch(
+      new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "https://twrxa.khomenko.de",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: [{ productId: "printify-shirt", quantity: 1, variantId: 999 }],
+        }),
+      }),
+      makeEnv(),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("variant_unavailable");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://twrxa.khomenko.de",
+    );
+    expect(logger).toHaveBeenCalledWith(
+      "[checkout-session] handler failed",
+      expect.objectContaining({ message: expect.stringContaining("variant") }),
+    );
+    logger.mockRestore();
+  });
+
+  it("preserves allowlisted CORS and hides internal details on Stripe 500 errors", async () => {
+    const docs = new Map<string, Record<string, unknown>>([
+      [
+        "products/printify-shirt",
+        document("products/printify-shirt", {
+          active: true,
+          name: "Test Shirt",
+          price: 2500,
+          currency: "usd",
+          printifyProductId: "printify-shirt",
+          variantMatrix: [
+            {
+              color: "White",
+              size: "M",
+              printifyVariantId: 104,
+              unitAmount: 2800,
+            },
+          ],
+        }),
+      ],
+    ]);
+    mockExternalServices(docs, { throwOnStripe: true });
+    const token = await createFirebaseToken();
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await worker.fetch(
+      new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "https://twrxa.khomenko.de",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: [{ productId: "printify-shirt", quantity: 1, variantId: 104 }],
+        }),
+      }),
+      makeEnv(),
+    );
+    const body = (await response.json()) as { message: string };
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://twrxa.khomenko.de",
+    );
+    expect(body.message).not.toContain("Stripe test failure");
+    expect(logger).toHaveBeenCalledWith(
+      "[checkout-session] Stripe Checkout session creation failed",
+      expect.objectContaining({ message: "Stripe test failure" }),
+    );
+    logger.mockRestore();
   });
 
   it("processes a Stripe webhook replay with only one order update", async () => {
