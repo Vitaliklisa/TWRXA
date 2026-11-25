@@ -15,7 +15,7 @@ import 'package:twrxa/services/cart_repository.dart'
 
 void main() {
   testWidgets(
-      'a Firestore product opens its detail page and adds the chosen size and price',
+      'a malformed product does not prevent a valid Firestore product from loading',
       (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
@@ -37,6 +37,13 @@ void main() {
       ],
       'printifyVariants': {'S': 101, 'M': 102},
       'printifyVariantPrices': {'S': 2500, 'M': 2800},
+    });
+    await firestore.collection('products').doc('invalid-price').set({
+      'active': true,
+      'name': 'Invalid Product',
+      'price': 'not-an-int',
+      'currency': 'usd',
+      'createdAt': Timestamp.fromDate(DateTime(2026, 8, 1)),
     });
 
     await tester.pumpWidget(

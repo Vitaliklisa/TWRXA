@@ -21,12 +21,6 @@
       "destination": "/"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/sync-products",
-      "schedule": "0 9 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/flutter_service_worker.js",

@@ -1,6 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../index.ts";
 import type { Env } from "../types.ts";
+import { setDocsBatch } from "../lib/firestore.ts";
+import { logGoogleResponseFailure } from "../lib/google.ts";
 import { verifyPrintifySignature } from "../lib/printify.ts";
 import { verifyStripeSignature } from "../lib/stripe.ts";
 
@@ -289,6 +291,78 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("Google API diagnostics", () => {
+  it("logs provider error details while redacting bearer tokens", async () => {
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await logGoogleResponseFailure(
+      jsonResponse(
+        {
+          error: {
+            code: 403,
+            status: "PERMISSION_DENIED",
+            message: "Missing permission for Bearer sensitive-token",
+          },
+        },
+        403,
+      ),
+      "firestore-batch-write",
+    );
+
+    expect(logger).toHaveBeenCalledWith("[firestore-batch-write] Google API request failed", {
+      httpStatus: 403,
+      googleCode: 403,
+      googleStatus: "PERMISSION_DENIED",
+      message: "Missing permission for Bearer [redacted]",
+    });
+    expect(JSON.stringify(logger.mock.calls)).not.toContain("sensitive-token");
+    logger.mockRestore();
+  });
+
+  it("logs Google OAuth error descriptions without exposing raw response bodies", async () => {
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await logGoogleResponseFailure(
+      jsonResponse({ error: "invalid_grant", error_description: "Invalid JWT Signature." }, 400),
+      "google-auth",
+    );
+
+    expect(logger).toHaveBeenCalledWith("[google-auth] Google API request failed", {
+      httpStatus: 400,
+      googleCode: "invalid_grant",
+      message: "Invalid JWT Signature.",
+    });
+    logger.mockRestore();
+  });
+});
+
+describe("Firestore batch writes", () => {
+  it("uses a relative Firestore resource name in each write", async () => {
+    const batchRequests: Array<{ writes?: Array<{ update?: { name?: string } }> }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        if (url.hostname === "oauth2.googleapis.com") {
+          return jsonResponse({ access_token: "google-access-token-test", expires_in: 3600 });
+        }
+        if (url.hostname === "firestore.googleapis.com") {
+          batchRequests.push(JSON.parse(String(init.body ?? "{}")));
+          return jsonResponse({ writeResults: [] });
+        }
+        return new Response(null, { status: 500 });
+      }),
+    );
+
+    await setDocsBatch(makeEnv(), [{ path: "products/item-123", fields: { name: "Test" } }]);
+
+    expect(batchRequests).toHaveLength(1);
+    expect(batchRequests[0]?.writes?.[0]?.update?.name).toBe(
+      "projects/twrxa-shop/databases/(default)/documents/products/item-123",
+    );
+  });
 });
 
 describe("Cloudflare commerce API", () => {

@@ -54,7 +54,7 @@ appropriate), then redeploy. Values are intentionally not included here.
 | `PRINTIFY_WEBHOOK_SECRET`      | Yes      | HMAC secret configured for Printify webhooks.                                   |
 | `PRINTIFY_SHOP_ID`             | Yes      | Numeric Printify shop ID.                                                       |
 | `APP_BASE_URL`                 | Yes      | HTTPS storefront base URL used for checkout returns.                            |
-| `CRON_SECRET`                  | Yes      | Random bearer secret for scheduled/manual catalog sync.                         |
+| `CRON_SECRET`                  | Vercel rollback only | Bearer secret for sync when using the Vercel handlers.                     |
 | `PRODUCT_CURRENCY`             | No       | Three-letter currency; defaults to `USD`.                                       |
 | `CHECKOUT_ALLOWED_COUNTRIES`   | No       | Comma-separated ISO country codes; defaults to `US,CA`.                         |
 | `FLAT_SHIPPING_AMOUNT_CENTS`   | No       | Flat shipping amount in minor units; defaults to `0`.                           |
@@ -89,10 +89,9 @@ Firebase project/account ID, or service-account data.
 - `POST /api/sync-products` — accepts signed Printify product webhooks. It
   fetches all pages from the configured shop and upserts mapped products.
 - `GET /api/sync-products` — runs a full sync only with
-  `Authorization: Bearer <CRON_SECRET>`. Vercel Cron is configured for one
-  daily run at 09:00 UTC, compatible with Hobby's daily schedule limit. Product
-  webhooks are the near-real-time path; on plans without usable product
-  webhooks, daily sync cannot guarantee an update within 60 minutes.
+  `Authorization: Bearer <CRON_SECRET>`. The active Cloudflare Worker runs one
+  daily cron at 09:00 UTC. Product webhooks are the near-real-time path; daily
+  sync alone cannot guarantee an update within 60 minutes.
 - `GET /api/health` — reports configuration booleans and sync/deployment
   timestamps, never secret values.
 
@@ -116,9 +115,9 @@ After setting environment variables and deploying, run a sync in a protected
 terminal:
 
 ```powershell
-$env:CRON_SECRET = Read-Host "Vercel CRON_SECRET"
+$env:CRON_SECRET = Read-Host "Cloudflare Worker CRON_SECRET"
 curl.exe -H "Authorization: Bearer $env:CRON_SECRET" `
-  https://twrxa.vercel.app/api/sync-products
+  https://api.twrxa.khomenko.de/api/sync-products
 Remove-Item Env:CRON_SECRET
 ```
 
@@ -152,10 +151,15 @@ retrying them.
 
 The Worker uses Firestore REST with a short-lived Google OAuth token signed
 using Web Crypto. It does not use `firebase-admin`, gRPC, or Node crypto.
-`wrangler.toml` declares `api.twrxa.khomenko.de` as a Cloudflare Custom
-Domain. Cloudflare creates the DNS record and certificate for a Custom Domain;
-do not also create a CNAME to `workers.dev`, because an existing CNAME blocks
-Custom Domain creation. The domain must be in an active Cloudflare zone.
+`wrangler.toml` deploys one Worker named `twrxa`, serving all API paths on the
+Custom Domain `api.twrxa.khomenko.de`. Cloudflare creates the DNS record and
+certificate for a Custom Domain; do not also create a CNAME to `workers.dev`,
+because an existing CNAME blocks Custom Domain creation. The domain must be
+in an active Cloudflare zone.
+
+The single Worker has one daily catalog-sync cron at 09:00 UTC. Keep the
+schedule on this Worker only; do not add separate cron triggers to endpoint
+environments.
 
 Set these **secrets** after the Worker has been deployed once. The service
 account JSON replaces the three `FIREBASE_ADMIN_*` Vercel variables; the
@@ -180,7 +184,7 @@ CORS. Add any preview origin explicitly; wildcard origins are not accepted.
 The Vercel web build accepts `API_BASE_URL` to override the default API
 hostname for preview environments.
 
-After review and merge, the operator can deploy from the repository root:
+Deploy the Worker once:
 
 ```powershell
 npm run worker:dev
@@ -188,8 +192,8 @@ npx wrangler deploy --dry-run --outdir dist
 npm run worker:deploy
 ```
 
-The first real deploy creates the Worker. Then set each secret without putting
-its value in source control or chat, and deploy again to activate them:
+Set each required secret on the single Worker without putting its value in
+source control or chat:
 
 ```powershell
 npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
@@ -203,13 +207,12 @@ npx wrangler secret put CRON_SECRET
 npm run worker:deploy
 ```
 
-The configured Custom Domain is created by Wrangler on deployment. If
-attaching it in the dashboard instead, use **Workers & Pages → twrxa-api →
-Settings → Domains & Routes → Add → Custom Domain** and enter
-`api.twrxa.khomenko.de`; do not add a separate `workers.dev` CNAME.
+If the existing Custom Domain is still attached to the former `twrxa-api`
+Worker, move `api.twrxa.khomenko.de` to `twrxa` in **Workers & Pages → twrxa →
+Settings → Domains & Routes** before removing the old Worker. Do not remove
+the old route until the new Worker is responding on the domain.
 
-Wrangler also configures a daily product sync at 09:00 UTC. Signed Printify
-product webhooks remain the near-real-time path.
+Signed Printify product webhooks remain the near-real-time path.
 
 Repoint Stripe and Printify webhooks directly to the Worker once it has passed
 test-mode verification. Do not have both Vercel and the Worker process the

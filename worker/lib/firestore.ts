@@ -1,4 +1,4 @@
-import { googleAccessToken } from "./google.ts";
+import { googleAccessToken, logGoogleResponseFailure } from "./google.ts";
 import { ApiError } from "./http.ts";
 import type { Env } from "../types.ts";
 
@@ -69,7 +69,7 @@ function decodeFields(fields: Record<string, FirestoreValue> = {}) {
   );
 }
 
-function pathUrl(path: string) {
+function documentPathSegments(path: string) {
   const segments = path.split("/");
   if (
     segments.length === 0 ||
@@ -77,7 +77,16 @@ function pathUrl(path: string) {
   ) {
     throw new TypeError("Invalid Firestore document path.");
   }
+  return segments;
+}
+
+function pathUrl(path: string) {
+  const segments = documentPathSegments(path);
   return `${apiRoot}/documents/${segments.map(encodeURIComponent).join("/")}`;
+}
+
+function documentResourceName(path: string) {
+  return `projects/${projectId}/databases/${database}/documents/${documentPathSegments(path).join("/")}`;
 }
 
 async function authorizedFetch(env: Env, input: RequestInfo | URL, init: RequestInit = {}) {
@@ -93,6 +102,7 @@ async function parseResponse(response: Response) {
   if (response.status === 404) return null;
   if (response.status === 409 || response.status === 412) throw new FirestoreConflict();
   if (!response.ok) {
+    await logGoogleResponseFailure(response, "firestore");
     throw new ApiError(503, "Firestore request failed.", "backend_unavailable");
   }
   return (await response.json()) as Record<string, unknown>;
@@ -208,6 +218,7 @@ export async function queryEqual(
     }),
   });
   if (!response.ok) {
+    await logGoogleResponseFailure(response, "firestore-query");
     throw new ApiError(503, "Firestore query failed.", "backend_unavailable");
   }
   const results = (await response.json()) as Array<{ document?: Record<string, unknown> }>;
@@ -221,7 +232,7 @@ export async function setDocsBatch(
   if (entries.length === 0) return;
   const writes = entries.map(({ path, fields }) => ({
     update: {
-      name: `${apiRoot}/documents/${path.split("/").map(encodeURIComponent).join("/")}`,
+      name: documentResourceName(path),
       fields: encodeFields(fields),
     },
     updateMask: { fieldPaths: Object.keys(fields) },
@@ -231,6 +242,7 @@ export async function setDocsBatch(
     body: JSON.stringify({ writes }),
   });
   if (!response.ok) {
+    await logGoogleResponseFailure(response, "firestore-batch-write");
     throw new ApiError(503, "Firestore batch write failed.", "backend_unavailable");
   }
 }

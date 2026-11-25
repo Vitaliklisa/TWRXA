@@ -166,12 +166,7 @@ class StoreProduct {
       tags,
       variants,
     );
-    final images = data['images'] is List
-        ? (data['images'] as List)
-            .whereType<String>()
-            .where((image) => Uri.tryParse(image)?.scheme == 'https')
-            .toList()
-        : const <String>[];
+    final images = _readImages(data['images']);
 
     return StoreProduct(
       id: snapshot.id,
@@ -241,34 +236,77 @@ DateTime? _readDate(Object? value) {
 }
 
 Map<String, int> _readIntMap(Object? value) {
-  if (value is! Map) return const {};
-  return Map<String, int>.unmodifiable({
-    for (final entry in value.entries)
-      if (entry.key is String && entry.value is int && entry.value > 0)
-        entry.key as String: entry.value as int,
-  });
+  if (value == null) return const {};
+  if (value is! Map) {
+    throw const FormatException('Product variant data must be a map.');
+  }
+  final result = <String, int>{};
+  for (final entry in value.entries) {
+    final key = entry.key;
+    final amount = entry.value;
+    if (key is! String || amount is! int || amount <= 0) {
+      throw const FormatException(
+        'Product variant data contains an invalid entry.',
+      );
+    }
+    result[key] = amount;
+  }
+  return Map<String, int>.unmodifiable(result);
+}
+
+List<String> _readImages(Object? value) {
+  if (value == null) return const [];
+  if (value is! List) {
+    throw const FormatException('Product images must be a list of strings.');
+  }
+  final images = <String>[];
+  for (final image in value) {
+    if (image is! String) {
+      throw const FormatException('Product images must be a list of strings.');
+    }
+    if (Uri.tryParse(image)?.scheme == 'https') images.add(image);
+  }
+  return List<String>.unmodifiable(images);
 }
 
 List<StoreProductVariant> _readVariantMatrix(Object? value) {
-  if (value is! List) return const [];
-  return List<StoreProductVariant>.unmodifiable([
-    for (final entry in value)
-      if (entry is Map &&
-          entry['variantKey'] is String &&
-          entry['printifyVariantId'] is int &&
-          (entry['printifyVariantId'] as int) > 0 &&
-          entry['unitAmount'] is int &&
-          (entry['unitAmount'] as int) > 0 &&
-          (entry['color'] == null || entry['color'] is String) &&
-          (entry['size'] == null || entry['size'] is String))
-        StoreProductVariant(
-          variantKey: entry['variantKey'] as String,
-          printifyVariantId: entry['printifyVariantId'] as int,
-          unitAmount: entry['unitAmount'] as int,
-          color: entry['color'] as String?,
-          size: entry['size'] as String?,
-        ),
-  ]);
+  if (value == null) return const [];
+  if (value is! List) {
+    throw const FormatException('Product variant matrix must be a list.');
+  }
+  final variants = <StoreProductVariant>[];
+  for (final entry in value) {
+    if (entry is! Map) {
+      throw const FormatException(
+          'Product variant matrix contains an invalid entry.');
+    }
+    final variantKey = entry['variantKey'];
+    final printifyVariantId = entry['printifyVariantId'];
+    final unitAmount = entry['unitAmount'];
+    final color = entry['color'];
+    final size = entry['size'];
+    if (variantKey is! String ||
+        variantKey.isEmpty ||
+        printifyVariantId is! int ||
+        printifyVariantId <= 0 ||
+        unitAmount is! int ||
+        unitAmount <= 0 ||
+        (color != null && color is! String) ||
+        (size != null && size is! String)) {
+      throw const FormatException(
+          'Product variant matrix contains an invalid entry.');
+    }
+    variants.add(
+      StoreProductVariant(
+        variantKey: variantKey,
+        printifyVariantId: printifyVariantId,
+        unitAmount: unitAmount,
+        color: color is String ? color : null,
+        size: size is String ? size : null,
+      ),
+    );
+  }
+  return List<StoreProductVariant>.unmodifiable(variants);
 }
 
 String _inferCategory(

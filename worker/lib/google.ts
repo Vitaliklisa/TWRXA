@@ -13,6 +13,49 @@ type ServiceAccount = {
 
 let cachedToken: { clientEmail: string; accessToken: string; expiresAt: number } | undefined;
 
+function diagnosticIdentifier(value: unknown) {
+  return typeof value === "string" && /^[A-Za-z0-9_.-]{1,100}$/.test(value) ? value : undefined;
+}
+
+function diagnosticMessage(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  return value
+    .replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/gi, "[redacted key]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[redacted JWT]")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .slice(0, 500);
+}
+
+export async function logGoogleResponseFailure(response: Response, service: string) {
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => undefined)) as
+    | {
+        error?: string | { code?: unknown; status?: unknown; message?: unknown };
+        error_description?: unknown;
+      }
+    | undefined;
+  const details: Record<string, string | number> = { httpStatus: response.status };
+
+  if (typeof body?.error === "string") {
+    const code = diagnosticIdentifier(body.error);
+    const message = diagnosticMessage(body.error_description);
+    if (code) details.googleCode = code;
+    if (message) details.message = message;
+  } else if (body?.error && typeof body.error === "object") {
+    const { code, status, message } = body.error;
+    if (typeof code === "number") details.googleCode = code;
+    const safeStatus = diagnosticIdentifier(status);
+    const safeMessage = diagnosticMessage(message);
+    if (safeStatus) details.googleStatus = safeStatus;
+    if (safeMessage) details.message = safeMessage;
+  }
+
+  console.error(`[${service}] Google API request failed`, details);
+}
+
 function decodeBase64(value: string) {
   const binary = atob(value);
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -95,6 +138,7 @@ export async function googleAccessToken(env: Env) {
     }),
   });
   if (!response.ok) {
+    await logGoogleResponseFailure(response, "google-auth");
     throw new ApiError(503, "Google service authentication failed.", "backend_unavailable");
   }
   const result = (await response.json()) as { access_token?: unknown; expires_in?: unknown };

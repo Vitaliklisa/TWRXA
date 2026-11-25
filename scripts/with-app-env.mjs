@@ -137,11 +137,17 @@ function readEnvLocal(root) {
   return out;
 }
 
-function resolveCommand(command) {
-  if (process.platform !== "win32") return command;
-  if (command.includes("\\") || command.includes("/")) return command;
+function resolveCommand(command, args) {
+  if (process.platform !== "win32") return { command, args };
+  if (command === "vite") {
+    const viteEntry = join(projectRoot(), "node_modules", "vite", "bin", "vite.js");
+    if (existsSync(viteEntry)) {
+      return { command: process.execPath, args: [viteEntry, ...args] };
+    }
+  }
+  if (command.includes("\\") || command.includes("/")) return { command, args };
   const localBin = join(projectRoot(), "node_modules", ".bin", `${command}.cmd`);
-  return existsSync(localBin) ? localBin : command;
+  return { command: existsSync(localBin) ? localBin : command, args };
 }
 
 function main(argv) {
@@ -150,7 +156,7 @@ function main(argv) {
     console.error("usage: node scripts/with-app-env.mjs <command> [args…]");
     process.exit(2);
   }
-  const command = resolveCommand(commandRaw);
+  const resolved = resolveCommand(commandRaw, args);
   const env = mergeAppEnv(
     { ...readEnvLocal(projectRoot()), ...readAppEnv(projectRoot()) },
     process.env,
@@ -181,7 +187,7 @@ function main(argv) {
   // id so a build without Google creds falls back to the web flow instead of
   // offering a button that cannot work.
   env.VITE_NATIVE_GOOGLE ??= env.VITE_GOOGLE_WEB_CLIENT_ID ? "true" : "false";
-  const child = spawn(command, args, {
+  const child = spawn(resolved.command, resolved.args, {
     stdio: "inherit",
     env,
     shell: false,
@@ -191,7 +197,7 @@ function main(argv) {
     process.on(signal, () => child.kill(signal));
   }
   child.on("error", (err) => {
-    console.error(`[with-app-env] failed to run ${command}:`, err?.message || err);
+    console.error(`[with-app-env] failed to run ${resolved.command}:`, err?.message || err);
     process.exit(127);
   });
   child.on("exit", (code, signal) => {

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/store_product.dart';
@@ -14,9 +15,15 @@ final storeProductsProvider = StreamProvider<List<StoreProduct>?>((ref) {
       .snapshots()
       .map((snapshot) {
     if (snapshot.docs.isEmpty) return null;
-    return snapshot.docs
-        .map(StoreProduct.fromSnapshot)
-        .where((product) => product.active)
-        .toList(growable: false);
+    final products = <StoreProduct>[];
+    for (final document in snapshot.docs) {
+      try {
+        final product = StoreProduct.fromSnapshot(document);
+        if (product.active) products.add(product);
+      } on FormatException catch (error) {
+        debugPrint('[twrxa] Skipping invalid product ${document.id}: $error');
+      }
+    }
+    return products.toList(growable: false);
   });
 });
