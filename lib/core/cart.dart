@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+const maxCartLineQuantity = 20;
+
 @immutable
 class CartItem {
   const CartItem({
@@ -58,6 +60,7 @@ class CartItem {
         unitAmount < 0 ||
         quantity is! int ||
         quantity < 1 ||
+        quantity > maxCartLineQuantity ||
         currency is! String ||
         (variant != null && variant is! String) ||
         (variantId != null && (variantId is! int || variantId < 1))) {
@@ -78,13 +81,20 @@ class CartItem {
 @immutable
 class Cart {
   Cart({Iterable<CartItem> items = const []})
-      : items = List.unmodifiable(items);
+      : items = _validatedItems(items);
 
   static final Cart empty = Cart();
 
   final List<CartItem> items;
 
   int get itemCount => items.fold(0, (total, item) => total + item.quantity);
+
+  int quantityFor(CartItem item) {
+    for (final existing in items) {
+      if (existing.id == item.id) return existing.quantity;
+    }
+    return 0;
+  }
 
   int get subtotal => items.fold(
         0,
@@ -97,14 +107,27 @@ class Cart {
     final index = items.indexWhere((item) => item.id == incoming.id);
     if (index == -1) return Cart(items: [...items, incoming]);
 
+    final quantity = items[index].quantity + incoming.quantity;
+    if (quantity > maxCartLineQuantity) {
+      throw ArgumentError.value(
+        quantity,
+        'quantity',
+        'Cannot exceed $maxCartLineQuantity units per cart item.',
+      );
+    }
     final updated = [...items];
-    updated[index] = incoming.withQuantity(
-      items[index].quantity + incoming.quantity,
-    );
+    updated[index] = incoming.withQuantity(quantity);
     return Cart(items: updated);
   }
 
   Cart setQuantity(String itemId, int quantity) {
+    if (quantity > maxCartLineQuantity) {
+      throw ArgumentError.value(
+        quantity,
+        'quantity',
+        'Cannot exceed $maxCartLineQuantity units per cart item.',
+      );
+    }
     final index = items.indexWhere((item) => item.id == itemId);
     if (index == -1) return this;
 
@@ -143,4 +166,18 @@ class Cart {
       }),
     );
   }
+}
+
+List<CartItem> _validatedItems(Iterable<CartItem> items) {
+  final validated = List<CartItem>.unmodifiable(items);
+  for (final item in validated) {
+    if (item.quantity < 1 || item.quantity > maxCartLineQuantity) {
+      throw ArgumentError.value(
+        item.quantity,
+        'quantity',
+        'Cart items must contain between 1 and $maxCartLineQuantity units.',
+      );
+    }
+  }
+  return validated;
 }

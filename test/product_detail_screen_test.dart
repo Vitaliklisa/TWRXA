@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:twrxa/core/store_product.dart';
 import 'package:twrxa/main.dart';
 import 'package:twrxa/providers/app_providers.dart';
 import 'package:twrxa/providers/cart_provider.dart';
@@ -14,6 +15,30 @@ import 'package:twrxa/services/cart_repository.dart'
     show CartRepository, guestCartStorageKey;
 
 void main() {
+  test('Printify HTML descriptions are reduced to safe plain text', () async {
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('products').doc('html-product').set({
+      'active': true,
+      'name': 'HTML Product',
+      'category': 'T-SHIRTS',
+      'description':
+          '<p>First<br>second</p><script>alert("bad")</script><iframe src="https://bad.example">frame</iframe><style>body{display:none}</style><a onclick="run()" href="javascript&#58;alert(1)">link</a>&lt;em&gt;plain&lt;/em&gt;',
+      'price': 2500,
+      'currency': 'usd',
+      'createdAt': Timestamp.fromDate(DateTime(2026, 8, 1)),
+    });
+
+    final product = StoreProduct.fromSnapshot(
+      await firestore.collection('products').doc('html-product').get(),
+    );
+
+    expect(product.description, 'First\nsecond\nlinkplain');
+    expect(product.description, isNot(contains('<')));
+    expect(product.description, isNot(contains('javascript:')));
+    expect(product.description, isNot(contains('alert')));
+    expect(product.description, isNot(contains('display:none')));
+  });
+
   testWidgets(
       'a malformed product does not prevent a valid Firestore product from loading',
       (tester) async {
@@ -37,6 +62,15 @@ void main() {
       ],
       'printifyVariants': {'S': 101, 'M': 102},
       'printifyVariantPrices': {'S': 2500, 'M': 2800},
+    });
+    await firestore.collection('products').doc('recommended-tee').set({
+      'active': true,
+      'name': 'Recommended Tee',
+      'category': 'T-SHIRTS',
+      'description': 'Another heavyweight cotton tee.',
+      'price': 3000,
+      'currency': 'usd',
+      'createdAt': Timestamp.fromDate(DateTime(2026, 8, 2)),
     });
     await firestore.collection('products').doc('invalid-price').set({
       'active': true,
@@ -72,6 +106,22 @@ void main() {
     expect(find.text('Printify Tee'), findsOneWidget);
     expect(find.byKey(const ValueKey('product-image-gallery')), findsOneWidget);
     expect(find.text('\$25.00'), findsOneWidget);
+    expect(find.text('Recommended for purchase'), findsOneWidget);
+    expect(find.byKey(const ValueKey('recommended-product-recommended-tee')),
+        findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('product-size-guide')));
+    await tester.tap(find.byKey(const ValueKey('product-size-guide')));
+    await tester.pumpAndSettle();
+    expect(find.text('Size Grid'), findsOneWidget);
+    expect(find.textContaining('Chest width'), findsOneWidget);
+    await tester.tap(find.text('CLOSE'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('product-care-guide')));
+    await tester.tap(find.byKey(const ValueKey('product-care-guide')));
+    await tester.pumpAndSettle();
+    expect(find.text('Taking Care of the Item'), findsOneWidget);
+    await tester.tap(find.text('CLOSE'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('product-variant-M')));
     await tester.pumpAndSettle();

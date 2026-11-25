@@ -94,18 +94,22 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
     StoreProductVariant? selectedVariant,
   }) async {
     try {
-      await ref.read(cartProvider.notifier).addItem(
-            CartItem(
-              productId: product.id,
-              name: product.name,
-              unitAmount:
-                  selectedVariant?.unitAmount ?? product.unitAmountFor(variant),
-              quantity: 1,
-              currency: product.currency,
-              variant: selectedVariant?.label ?? variant,
-              variantId: selectedVariant?.printifyVariantId,
-            ),
-          );
+      final item = CartItem(
+        productId: product.id,
+        name: product.name,
+        unitAmount:
+            selectedVariant?.unitAmount ?? product.unitAmountFor(variant),
+        quantity: 1,
+        currency: product.currency,
+        variant: selectedVariant?.label ?? variant,
+        variantId: selectedVariant?.printifyVariantId,
+      );
+      final cart = await ref.read(cartProvider.future);
+      if (cart.quantityFor(item) + item.quantity > maxCartLineQuantity) {
+        _showCartQuantityLimit();
+        return;
+      }
+      await ref.read(cartProvider.notifier).addItem(item);
     } catch (error) {
       _showCartError(error);
       return;
@@ -137,6 +141,23 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
           ),
         ),
       );
+  }
+
+  void _showCartQuantityLimit() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Maximum quantity is 20 per item.')),
+      );
+  }
+
+  void _openProduct(StoreProduct product) {
+    if (product.fromFirestore) {
+      Navigator.of(context).pushNamed(Routes.productDetailPath(product.id));
+    } else {
+      _showProduct(product);
+    }
   }
 
   void _showProduct(StoreProduct product) {
@@ -517,10 +538,13 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                                 ),
                                 IconButton(
                                   tooltip: 'Add one ${line.name}',
-                                  onPressed: () => _changeQuantity(
-                                    line.id,
-                                    line.quantity + 1,
-                                  ),
+                                  onPressed:
+                                      line.quantity < maxCartLineQuantity
+                                          ? () => _changeQuantity(
+                                                line.id,
+                                                line.quantity + 1,
+                                              )
+                                          : null,
                                   icon: const Icon(
                                     Icons.add_circle_outline_rounded,
                                     size: 19,
@@ -1273,16 +1297,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                     borderRadius: BorderRadius.circular(16),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () {
-                        if (product.fromFirestore) {
-                          Navigator.of(context).pushNamed(
-                            Routes.productDetail,
-                            arguments: product.id,
-                          );
-                        } else {
-                          _showProduct(product);
-                        }
-                      },
+                      onTap: () => _openProduct(product),
                       child: _ProductArtwork(product: product),
                     ),
                   ),
@@ -1315,7 +1330,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                     key: ValueKey('quick-add-${product.id}'),
                     tooltip: 'Add ${product.name} to bag',
                     onPressed: product.variantMatrix.isNotEmpty
-                        ? () => _showProduct(product)
+                        ? () => _openProduct(product)
                         : () => _addToBag(
                               product,
                               variant: product.quickAddVariant,

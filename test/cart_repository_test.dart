@@ -98,6 +98,28 @@ void main() {
     expect(restored.items.single.variantId, 104);
   });
 
+  test('cart accepts 20 units and rejects a 21st unit on the same line', () {
+    const item = CartItem(
+      productId: 'tee',
+      name: 'Heavyweight Tee',
+      unitAmount: 4800,
+      quantity: 20,
+      variant: 'M',
+      variantId: 104,
+    );
+    final cart = Cart(items: const [item]);
+
+    expect(cart.quantityFor(item), 20);
+    expect(
+      () => cart.add(item.withQuantity(1)),
+      throwsA(isA<ArgumentError>()),
+    );
+    expect(
+      () => CartItem.fromJson({...item.toJson(), 'quantity': 21}),
+      throwsFormatException,
+    );
+  });
+
   test('web guest storage persists in cookies and migrates to Firestore',
       () async {
     final cookies = _MemoryGuestCartStorage();

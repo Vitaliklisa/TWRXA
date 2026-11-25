@@ -118,9 +118,10 @@ test("checkout validates cart bounds and rejects ambiguous variant submissions",
     /invalid product or quantity/i,
   );
   assert.throws(
-    () => normalizeCartItems([{ productId: "tee", quantity: 11 }]),
+    () => normalizeCartItems([{ productId: "tee", quantity: 21 }]),
     /invalid product or quantity/i,
   );
+  assert.equal(normalizeCartItems([{ productId: "tee", quantity: 20 }])[0].quantity, 20);
 });
 
 test("Printify webhook signatures are bound to the exact raw body", () => {
