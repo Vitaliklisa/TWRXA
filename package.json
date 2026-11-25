@@ -26,6 +26,8 @@
     "check:ci": "node scripts/check-workflow.mjs && node scripts/check-workflow-shell.mjs",
     "clean": "node scripts/deep-clean.mjs --dry-run",
     "clean:apply": "node scripts/deep-clean.mjs --apply",
+    "products:cleanup-malformed": "node scripts/delete-malformed-products.mjs",
+    "products:cleanup-malformed:apply": "node scripts/delete-malformed-products.mjs --apply",
     "lint": "eslint .",
     "format": "prettier --write .",
     "build:web": "node scripts/build-web.mjs",
