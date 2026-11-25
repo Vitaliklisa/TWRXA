@@ -176,7 +176,11 @@ class StoreProduct {
       currency: currency.toLowerCase(),
       createdAt: createdAt,
       description:
-          data['description'] is String ? data['description'] as String : '',
+          _cleanProductDescription(
+            data['description'] is String
+                ? data['description'] as String
+                : '',
+          ),
       tag: data['tag'] is String && (data['tag'] as String).trim().isNotEmpty
           ? (data['tag'] as String).trim()
           : tags.isNotEmpty
@@ -194,6 +198,37 @@ class StoreProduct {
       fromFirestore: true,
     );
   }
+}
+
+String _cleanProductDescription(String value) {
+  return value
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&#58;', ':')
+      .replaceAll('&#x3a;', ':')
+      .replaceAll('&colon;', ':')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&amp;', '&')
+      .replaceAll(
+        RegExp(r'<script\b[^>]*>[\s\S]*?</script\s*>', caseSensitive: false),
+        '',
+      )
+      .replaceAll(
+        RegExp(r'<iframe\b[^>]*>[\s\S]*?</iframe\s*>', caseSensitive: false),
+        '',
+      )
+      .replaceAll(
+        RegExp(r'<style\b[^>]*>[\s\S]*?</style\s*>', caseSensitive: false),
+        '',
+      )
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</p\s*>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll(RegExp(r'javascript\s*:', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
 }
 
 class StoreProductVariant {
