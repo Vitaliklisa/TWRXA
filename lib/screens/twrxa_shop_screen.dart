@@ -1276,8 +1276,7 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                       onTap: () {
                         if (product.fromFirestore) {
                           Navigator.of(context).pushNamed(
-                            Routes.productDetail,
-                            arguments: product.id,
+                            Routes.productDetailPath(product.id),
                           );
                         } else {
                           _showProduct(product);

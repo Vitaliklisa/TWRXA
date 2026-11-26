@@ -1,6 +1,5 @@
 export interface Env {
   APP_BASE_URL: string;
-  APP_ALLOWED_ORIGINS?: string;
   GOOGLE_SERVICE_ACCOUNT_JSON: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;

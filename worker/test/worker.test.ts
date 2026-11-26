@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../index.ts";
 import type { Env } from "../types.ts";
+import { normalizeCartItems } from "../lib/checkout.ts";
 import { setDocsBatch } from "../lib/firestore.ts";
 import { logGoogleResponseFailure } from "../lib/google.ts";
 import { verifyPrintifySignature } from "../lib/printify.ts";
@@ -154,6 +155,7 @@ function mockExternalServices(initialDocuments: Map<string, Record<string, unkno
   const writes = { orders: 0, events: 0 };
   const orderRequestBodies: Array<Record<string, unknown>> = [];
   const stripeForms: URLSearchParams[] = [];
+  let stripeFailure: { body: unknown; status: number } | null = null;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const method = init.method ?? "GET";
@@ -176,6 +178,7 @@ function mockExternalServices(initialDocuments: Map<string, Record<string, unkno
     }
     if (url.hostname === "api.stripe.com") {
       stripeForms.push(new URLSearchParams(String(init.body ?? "")));
+      if (stripeFailure) return jsonResponse(stripeFailure.body, stripeFailure.status);
       return jsonResponse({
         id: "cs_test_worker123",
         url: "https://checkout.stripe.com/c/pay/cs_test_worker123",
@@ -243,7 +246,16 @@ function mockExternalServices(initialDocuments: Map<string, Record<string, unkno
     return jsonResponse({ error: `unexpected request to ${url.hostname}` }, 500);
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { documents, fetchMock, orderRequestBodies, stripeForms, writes };
+  return {
+    documents,
+    fetchMock,
+    orderRequestBodies,
+    stripeForms,
+    writes,
+    failStripeWith(body: unknown, status: number) {
+      stripeFailure = { body, status };
+    },
+  };
 }
 
 beforeAll(async () => {
@@ -383,6 +395,32 @@ describe("Cloudflare commerce API", () => {
     });
   });
 
+  it("allows preflight requests from preview origins", async () => {
+    mockExternalServices();
+    const response = await worker.fetch(
+      new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://preview-123.vercel.app",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "authorization,content-type",
+        },
+      }),
+      makeEnv(),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain("Authorization");
+  });
+
+  it("accepts quantities through twenty and rejects larger quantities", () => {
+    expect(normalizeCartItems([{ productId: "tee", quantity: 20 }])[0]?.quantity).toBe(20);
+    expect(() => normalizeCartItems([{ productId: "tee", quantity: 21 }])).toThrow(
+      "Cart contains an invalid product or quantity.",
+    );
+  });
+
   it("accepts a valid Stripe signature and rejects invalid or mutated bodies", async () => {
     const secret = "whsec_signature_test";
     const body = new TextEncoder().encode('{"type":"test.event"}');
@@ -456,7 +494,7 @@ describe("Cloudflare commerce API", () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          items: [{ productId: "printify-shirt", quantity: 1, variantId: 104 }],
+          items: [{ productId: "printify-shirt", quantity: 20, variantId: 104 }],
         }),
       }),
       makeEnv(),
@@ -472,8 +510,77 @@ describe("Cloudflare commerce API", () => {
     expect(body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_worker123");
     expect(body.orderId).toMatch(/^[A-Za-z0-9_-]{10,64}$/);
     expect(printifyItems[0].variant_id).toBe(104);
+    expect(printifyItems[0].quantity).toBe(20);
+    expect(services.stripeForms[0].get("line_items[0][quantity]")).toBe("20");
     expect(services.stripeForms[0].get("line_items[0][price_data][unit_amount]")).toBe("2800");
     expect(services.stripeForms[0].get("metadata[uid]")).toBe("firebase-user-123");
+  });
+
+  it("logs actionable Stripe errors and keeps CORS headers on checkout failures", async () => {
+    const docs = new Map<string, Record<string, unknown>>([
+      [
+        "products/printify-shirt",
+        document("products/printify-shirt", {
+          active: true,
+          name: "Test Shirt",
+          price: 2500,
+          currency: "usd",
+          printifyProductId: "printify-shirt",
+          variantMatrix: [
+            {
+              color: "White",
+              size: "M",
+              printifyVariantId: 104,
+              unitAmount: 2800,
+              priceCents: 2800,
+            },
+          ],
+        }),
+      ],
+    ]);
+    const services = mockExternalServices(docs);
+    services.failStripeWith(
+      {
+        error: {
+          type: "invalid_request_error",
+          code: "account_invalid",
+          param: "payment_intent_data[transfer_data][destination]",
+          message: "Invalid destination account.",
+        },
+      },
+      400,
+    );
+    const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const token = await createFirebaseToken();
+      const response = await worker.fetch(
+        new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Origin: "https://preview-123.vercel.app",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            items: [{ productId: "printify-shirt", quantity: 1, variantId: 104 }],
+          }),
+        }),
+        makeEnv(),
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(logger).toHaveBeenCalledWith(
+        "[checkout-session] route failed",
+        expect.objectContaining({
+          error: "Error",
+          message: expect.stringContaining("Invalid destination account."),
+        }),
+      );
+      expect(JSON.stringify(logger.mock.calls)).not.toContain("sk_test_worker_only");
+    } finally {
+      logger.mockRestore();
+    }
   });
 
   it("processes a Stripe webhook replay with only one order update", async () => {

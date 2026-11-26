@@ -27,7 +27,7 @@ void main() {
       'active': true,
       'name': 'Printify Tee',
       'category': 'T-SHIRTS',
-      'description': 'A heavyweight cotton tee.',
+      'description': 'A heavyweight<br> cotton <b>tee</b> &amp; more.',
       'price': 2500,
       'currency': 'usd',
       'createdAt': Timestamp.fromDate(DateTime(2026, 8, 1)),
@@ -37,6 +37,16 @@ void main() {
       ],
       'printifyVariants': {'S': 101, 'M': 102},
       'printifyVariantPrices': {'S': 2500, 'M': 2800},
+    });
+    await firestore.collection('products').doc('printify-other').set({
+      'active': true,
+      'name': 'Second Tee',
+      'category': 'T-SHIRTS',
+      'description': 'A second product.',
+      'price': 2400,
+      'currency': 'usd',
+      'createdAt': Timestamp.fromDate(DateTime(2026, 8, 1)),
+      'printifyVariants': {'M': 103},
     });
     await firestore.collection('products').doc('invalid-price').set({
       'active': true,
@@ -72,12 +82,23 @@ void main() {
     expect(find.text('Printify Tee'), findsOneWidget);
     expect(find.byKey(const ValueKey('product-image-gallery')), findsOneWidget);
     expect(find.text('\$25.00'), findsOneWidget);
+    expect(find.text('A heavyweight\n cotton tee & more.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('recommended-product-printify-other')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('product-variant-M')));
     await tester.pumpAndSettle();
     expect(find.text('\$28.00'), findsOneWidget);
     await tester.tap(find.byTooltip('Increase quantity'));
     await tester.pumpAndSettle();
+    final quantityInput = find.byKey(const ValueKey('product-quantity-input'));
+    await tester.enterText(quantityInput, '25');
+    await tester.pump();
+    expect(tester.widget<TextField>(quantityInput).controller?.text, '20');
+    await tester.enterText(quantityInput, '2');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('product-add-to-cart')));
     await tester.pumpAndSettle();
 
@@ -90,6 +111,16 @@ void main() {
     expect(item['variant'], 'M');
     expect(item['unitAmount'], 2800);
     expect(item['quantity'], 2);
+
+    final recommendedProduct =
+        find.byKey(const ValueKey('recommended-product-printify-other'));
+    await tester.ensureVisible(recommendedProduct);
+    await tester.tap(recommendedProduct);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('product-detail-printify-other')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -177,6 +208,19 @@ void main() {
       await tester.tap(productCard);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('product-color')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('product-size-guide')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('product-size-guide-diagram')),
+          findsOneWidget);
+      expect(find.text('Chest width: seam to seam under the arms'),
+          findsOneWidget);
+      await tester.tap(find.text('CLOSE'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('product-care-guide')));
+      await tester.pumpAndSettle();
+      expect(find.text('Wash inside out'), findsOneWidget);
+      await tester.tap(find.text('CLOSE'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('product-color')));
       await tester.pumpAndSettle();

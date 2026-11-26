@@ -43,57 +43,51 @@ import type { Env } from "./types.ts";
 const app = new Hono<{ Bindings: Env }>();
 const maxPrintifyPages = 1_000;
 const firestoreBatchSize = 400;
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Max-Age": "600",
+};
 type WorkerScheduledController = { cron: string; scheduledTime: number };
 type WorkerExecutionContext = {
   waitUntil(promise: Promise<unknown>): void;
 };
 
 app.use("*", async (context, next) => {
-  const origin = context.req.header("origin");
-  const allowedOrigins = [context.env.APP_BASE_URL, context.env.APP_ALLOWED_ORIGINS ?? ""]
-    .join(",")
-    .split(",")
-    .map((value) => {
-      try {
-        return new URL(value.trim()).origin;
-      } catch {
-        return "";
-      }
-    })
-    .filter(Boolean);
-  const allowedOrigin = origin && allowedOrigins.includes(origin) ? origin : null;
-  if (allowedOrigin) {
-    context.header("Access-Control-Allow-Origin", origin);
-    context.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    context.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    context.header("Access-Control-Max-Age", "600");
-    context.header("Vary", "Origin");
-  }
   if (context.req.method === "OPTIONS") {
-    if (!origin || !allowedOrigin) {
-      return jsonResponse(403, { error: "origin_not_allowed", message: "Origin is not allowed." });
-    }
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Max-Age": "600",
-        Vary: "Origin",
-      },
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
   await next();
+  for (const [name, value] of Object.entries(corsHeaders)) {
+    context.header(name, value);
+  }
 });
 
 async function safeRoute(context: string, operation: () => Promise<Response>) {
   try {
     return await operation();
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[${context}] route failed`, {
+      error: error instanceof Error ? error.name : "UnknownError",
+      message: message
+        .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+        .replace(/\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9]+/g, "[redacted]")
+        .replace(/\bwhsec_[A-Za-z0-9]+\b/g, "[redacted]"),
+      ...(error instanceof ApiError ? { status: error.status, code: error.code } : {}),
+    });
     return errorResponse(error, context);
   }
 }
+
+app.onError((error) => {
+  const response = errorResponse(error, "worker");
+  for (const [name, value] of Object.entries(corsHeaders)) {
+    response.headers.set(name, value);
+  }
+  return response;
+});
 
 function authHeader(request: Request) {
   return request.headers.get("authorization") ?? "";

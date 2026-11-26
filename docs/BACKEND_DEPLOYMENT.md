@@ -95,11 +95,11 @@ Firebase project/account ID, or service-account data.
 - `GET /api/health` — reports configuration booleans and sync/deployment
   timestamps, never secret values.
 
-The Worker is on a dedicated API subdomain, so it allows browser requests only
-from `APP_BASE_URL`; it does not enable wildcard CORS. Webhook routes verify
-provider signatures over raw request bytes. Customer routes verify Firebase
-ID tokens server-side, including revoked-token checks; Firestore rules remain
-the authority for client-side reads and writes.
+The Worker allows cross-origin browser requests so production and preview
+storefronts can reach the API. It does not allow credentialed cookies; customer
+routes require Firebase ID tokens, and webhook routes verify provider
+signatures over raw request bytes. Firestore rules remain the authority for
+client-side reads and writes.
 
 ## Product and variant sync
 
@@ -176,11 +176,10 @@ connected account and cron secret are additional secrets needed by the Worker:
 | `PRINTIFY_SHOP_ID`            | Numeric Printify shop ID.                                         |
 | `CRON_SECRET`                 | Bearer secret for scheduled/manual product sync.                  |
 
-`APP_BASE_URL`, `APP_ALLOWED_ORIGINS`, `PRODUCT_CURRENCY`, `CHECKOUT_ALLOWED_COUNTRIES`,
+`APP_BASE_URL`, `PRODUCT_CURRENCY`, `CHECKOUT_ALLOWED_COUNTRIES`,
 `FLAT_SHIPPING_AMOUNT_CENTS`, and `STRIPE_APPLICATION_FEE_BPS` are ordinary
-Worker variables in `wrangler.toml`. The production storefront origin must
-match `APP_BASE_URL` or be listed exactly in `APP_ALLOWED_ORIGINS` for browser
-CORS. Add any preview origin explicitly; wildcard origins are not accepted.
+Worker variables in `wrangler.toml`. `APP_BASE_URL` is used for Checkout
+redirects; CORS does not depend on a fixed list of storefront origins.
 The Vercel web build accepts `API_BASE_URL` to override the default API
 hostname for preview environments.
 

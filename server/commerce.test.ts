@@ -113,12 +113,13 @@ test("checkout ignores client price and resolves the exact stored variant ID", (
 });
 
 test("checkout validates cart bounds and rejects ambiguous variant submissions", () => {
+  assert.equal(normalizeCartItems([{ productId: "tee", quantity: 20 }])[0].quantity, 20);
   assert.throws(
-    () => normalizeCartItems([{ productId: "../orders/private", quantity: 1 }]),
+    () => normalizeCartItems([{ productId: "tee", quantity: 21 }]),
     /invalid product or quantity/i,
   );
   assert.throws(
-    () => normalizeCartItems([{ productId: "tee", quantity: 11 }]),
+    () => normalizeCartItems([{ productId: "../orders/private", quantity: 1 }]),
     /invalid product or quantity/i,
   );
 });

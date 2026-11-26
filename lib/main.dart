@@ -44,5 +44,19 @@ class TwrxaApp extends StatelessWidget {
           Routes.faq: (_) => const FaqScreen(),
           Routes.publicOffer: (_) => const PublicOfferScreen(),
         },
+        onGenerateRoute: (settings) {
+          final uri = Uri.tryParse(settings.name ?? '');
+          final segments = uri?.pathSegments;
+          if (segments != null &&
+              segments.length == 2 &&
+              segments.first == Routes.productPath.substring(1) &&
+              segments.last.isNotEmpty) {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => ProductDetailScreen(productId: segments.last),
+            );
+          }
+          return null;
+        },
       );
 }

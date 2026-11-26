@@ -6,7 +6,6 @@ workers_dev = false
 
 [vars]
 APP_BASE_URL = "https://twrxa.khomenko.de"
-APP_ALLOWED_ORIGINS = "https://twrxa.khomenko.de,https://twrxa.vercel.app"
 PRODUCT_CURRENCY = "USD"
 CHECKOUT_ALLOWED_COUNTRIES = "US,CA"
 FLAT_SHIPPING_AMOUNT_CENTS = "0"

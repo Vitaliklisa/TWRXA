@@ -175,8 +175,9 @@ class StoreProduct {
       price: price,
       currency: currency.toLowerCase(),
       createdAt: createdAt,
-      description:
-          data['description'] is String ? data['description'] as String : '',
+      description: _plainTextDescription(
+        data['description'] is String ? data['description'] as String : '',
+      ),
       tag: data['tag'] is String && (data['tag'] as String).trim().isNotEmpty
           ? (data['tag'] as String).trim()
           : tags.isNotEmpty
@@ -233,6 +234,27 @@ DateTime? _readDate(Object? value) {
   if (value is DateTime) return value;
   if (value is String) return DateTime.tryParse(value);
   return null;
+}
+
+String _plainTextDescription(String value) {
+  final plainText = value
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<[^>]*>'), '');
+  const entities = {
+    'nbsp': ' ',
+    'amp': '&',
+    'lt': '<',
+    'gt': '>',
+    'quot': '"',
+    '#39': "'",
+    '#x27': "'",
+  };
+  return plainText
+      .replaceAllMapped(
+        RegExp(r'&(nbsp|amp|lt|gt|quot|#39|#x27);', caseSensitive: false),
+        (match) => entities[match[1]!.toLowerCase()] ?? match[0]!,
+      )
+      .trim();
 }
 
 Map<String, int> _readIntMap(Object? value) {

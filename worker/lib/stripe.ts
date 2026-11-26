@@ -59,6 +59,23 @@ function copyToArrayBuffer(bytes: Uint8Array) {
   return copy.buffer;
 }
 
+function stripeErrorDetails(body: string) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return "";
+  }
+  if (!parsed || typeof parsed !== "object" || !("error" in parsed)) return "";
+  const error = parsed.error;
+  if (!error || typeof error !== "object") return "";
+  const details = error as Record<string, unknown>;
+  return ["type", "code", "param", "message"]
+    .map((key) => details[key])
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(", ");
+}
+
 export async function verifyStripeSignature(
   rawBody: Uint8Array,
   signatureHeader: string | null,
@@ -170,7 +187,14 @@ export async function createCheckoutSession(
     body: form,
   });
   if (!response.ok) {
-    throw new Error(`Stripe Checkout session creation failed with HTTP ${response.status}.`);
+    const body = await response.text();
+    const details = stripeErrorDetails(body);
+    const requestId = response.headers.get("request-id");
+    const context = requestId ? ` (request ${requestId})` : "";
+    const diagnostic = details ? ` Stripe error: ${details}` : "";
+    throw new Error(
+      `Stripe Checkout session creation failed with HTTP ${response.status}${context}.${diagnostic}`,
+    );
   }
   const session = (await response.json()) as StripeSession;
   if (typeof session.id !== "string" || typeof session.url !== "string") {

@@ -66,6 +66,10 @@ class Routes {
   static const faq = '/faq';
   static const publicOffer = '/public-offer';
   static const productDetail = '/product-detail';
+  static const productPath = '/product';
+
+  static String productDetailPath(String id) =>
+      '$productPath/${Uri.encodeComponent(id)}';
 }
 
 /// Which legal document, if any, is open over the current page.
