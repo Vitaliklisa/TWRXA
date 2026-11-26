@@ -137,7 +137,6 @@ function makeEnv(): Env {
     GOOGLE_SERVICE_ACCOUNT_JSON: googleServiceAccount,
     STRIPE_SECRET_KEY: "sk_test_worker_only",
     STRIPE_WEBHOOK_SECRET: "whsec_worker_test",
-    STRIPE_CONNECT_ACCOUNT_ID: "acct_worker123",
     PRINTIFY_API_TOKEN: "printify_worker_test",
     PRINTIFY_WEBHOOK_SECRET: "printify_webhook_test",
     PRINTIFY_SHOP_ID: "123456",
@@ -157,6 +156,7 @@ function mockExternalServices(
   const writes = { orders: 0, events: 0 };
   const orderRequestBodies: Array<Record<string, unknown>> = [];
   const stripeForms: URLSearchParams[] = [];
+  const stripeAccountLookups: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const method = init.method ?? "GET";
@@ -178,6 +178,10 @@ function mockExternalServices(
       });
     }
     if (url.hostname === "api.stripe.com") {
+      if (url.pathname === "/v1/account") {
+        stripeAccountLookups.push(method);
+        return jsonResponse({ id: "acct_platform123" });
+      }
       if (options.throwOnStripe) throw new Error("Stripe test failure");
       stripeForms.push(new URLSearchParams(String(init.body ?? "")));
       return jsonResponse({
@@ -247,7 +251,55 @@ function mockExternalServices(
     return jsonResponse({ error: `unexpected request to ${url.hostname}` }, 500);
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { documents, fetchMock, orderRequestBodies, stripeForms, writes };
+  return {
+    documents,
+    fetchMock,
+    orderRequestBodies,
+    stripeAccountLookups,
+    stripeForms,
+    writes,
+  };
+}
+
+function checkoutProductDocuments() {
+  return new Map<string, Record<string, unknown>>([
+    [
+      "products/printify-shirt",
+      document("products/printify-shirt", {
+        active: true,
+        name: "Test Shirt",
+        price: 2500,
+        currency: "usd",
+        printifyProductId: "printify-shirt",
+        variantMatrix: [
+          {
+            color: "White",
+            size: "M",
+            printifyVariantId: 104,
+            unitAmount: 2800,
+          },
+        ],
+      }),
+    ],
+  ]);
+}
+
+async function requestCheckout(env: Env, quantity = 1) {
+  const token = await createFirebaseToken();
+  return worker.fetch(
+    new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Origin: "https://twrxa.khomenko.de",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        items: [{ productId: "printify-shirt", quantity, variantId: 104 }],
+      }),
+    }),
+    env,
+  );
 }
 
 beforeAll(async () => {
@@ -383,7 +435,7 @@ describe("Cloudflare commerce API", () => {
       ok: true,
       functionsDeployedAt: null,
       lastProductSyncAt: null,
-      secretNamesPresent: Array(11).fill(true),
+      secretNamesPresent: Array(10).fill(true),
     });
   });
 
@@ -451,6 +503,8 @@ describe("Cloudflare commerce API", () => {
     ]);
     const services = mockExternalServices(docs);
     const token = await createFirebaseToken();
+    const env = makeEnv();
+    env.STRIPE_APPLICATION_FEE_BPS = "500";
     const response = await worker.fetch(
       new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
         method: "POST",
@@ -463,7 +517,7 @@ describe("Cloudflare commerce API", () => {
           items: [{ productId: "printify-shirt", quantity: 20, variantId: 104 }],
         }),
       }),
-      makeEnv(),
+      env,
     );
     const body = (await response.json()) as { orderId: string; url: string };
     const orderFields = services.orderRequestBodies[0].fields as Record<
@@ -479,6 +533,41 @@ describe("Cloudflare commerce API", () => {
     expect(printifyItems[0].quantity).toBe(20);
     expect(services.stripeForms[0].get("line_items[0][price_data][unit_amount]")).toBe("2800");
     expect(services.stripeForms[0].get("metadata[uid]")).toBe("firebase-user-123");
+    expect(services.stripeAccountLookups).toHaveLength(0);
+    expect(services.stripeForms[0].has("payment_intent_data[transfer_data][destination]")).toBe(
+      false,
+    );
+    expect(services.stripeForms[0].has("payment_intent_data[application_fee_amount]")).toBe(false);
+  });
+
+  it("adds Connect destination and fee only for a separate account", async () => {
+    const services = mockExternalServices(checkoutProductDocuments());
+    const env = makeEnv();
+    env.STRIPE_CONNECT_ACCOUNT_ID = "acct_connected123";
+    env.STRIPE_APPLICATION_FEE_BPS = "500";
+
+    const response = await requestCheckout(env);
+    const form = services.stripeForms[0];
+
+    expect(response.status).toBe(201);
+    expect(services.stripeAccountLookups).toEqual(["GET"]);
+    expect(form.get("payment_intent_data[transfer_data][destination]")).toBe("acct_connected123");
+    expect(form.get("payment_intent_data[application_fee_amount]")).toBe("140");
+  });
+
+  it("omits Connect parameters when the configured destination is the platform account", async () => {
+    const services = mockExternalServices(checkoutProductDocuments());
+    const env = makeEnv();
+    env.STRIPE_CONNECT_ACCOUNT_ID = "acct_platform123";
+    env.STRIPE_APPLICATION_FEE_BPS = "500";
+
+    const response = await requestCheckout(env);
+    const form = services.stripeForms[0];
+
+    expect(response.status).toBe(201);
+    expect(services.stripeAccountLookups).toEqual(["GET"]);
+    expect(form.has("payment_intent_data[transfer_data][destination]")).toBe(false);
+    expect(form.has("payment_intent_data[application_fee_amount]")).toBe(false);
   });
 
   it("returns an allowlisted CORS header and detailed logs for variant errors", async () => {

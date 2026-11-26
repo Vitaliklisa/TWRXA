@@ -59,6 +59,20 @@ function copyToArrayBuffer(bytes: Uint8Array) {
   return copy.buffer;
 }
 
+async function getPlatformAccountId(secretKey: string) {
+  const response = await fetch(`${stripeApiBase}/account`, {
+    headers: { Authorization: `Bearer ${secretKey}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Stripe account lookup failed with HTTP ${response.status}.`);
+  }
+  const account = (await response.json()) as { id?: unknown };
+  if (typeof account.id !== "string" || !/^acct_[A-Za-z0-9]+$/.test(account.id)) {
+    throw new Error("Stripe returned an invalid platform account ID.");
+  }
+  return account.id;
+}
+
 export async function verifyStripeSignature(
   rawBody: Uint8Array,
   signatureHeader: string | null,
@@ -156,9 +170,15 @@ export async function createCheckoutSession(
   form.set("metadata[uid]", input.uid);
   form.set("payment_intent_data[metadata][orderId]", input.orderId);
   form.set("payment_intent_data[metadata][uid]", input.uid);
-  form.set("payment_intent_data[transfer_data][destination]", env.STRIPE_CONNECT_ACCOUNT_ID);
-  if (input.applicationFee > 0) {
-    form.set("payment_intent_data[application_fee_amount]", String(input.applicationFee));
+  const connectAccountId = env.STRIPE_CONNECT_ACCOUNT_ID?.trim();
+  if (connectAccountId) {
+    const platformAccountId = await getPlatformAccountId(env.STRIPE_SECRET_KEY);
+    if (connectAccountId !== platformAccountId) {
+      form.set("payment_intent_data[transfer_data][destination]", connectAccountId);
+      if (input.applicationFee > 0) {
+        form.set("payment_intent_data[application_fee_amount]", String(input.applicationFee));
+      }
+    }
   }
 
   const response = await fetch(`${stripeApiBase}/checkout/sessions`, {
@@ -183,12 +203,11 @@ export function stripeConfigurationError(env: Env) {
   if (!env.STRIPE_SECRET_KEY) {
     return new ApiError(503, "Stripe is not configured.", "backend_misconfigured");
   }
-  if (!/^acct_[A-Za-z0-9]+$/.test(env.STRIPE_CONNECT_ACCOUNT_ID ?? "")) {
-    return new ApiError(
-      503,
-      "Stripe Connect is not configured for this store.",
-      "backend_misconfigured",
-    );
+  if (
+    env.STRIPE_CONNECT_ACCOUNT_ID?.trim() &&
+    !/^acct_[A-Za-z0-9]+$/.test(env.STRIPE_CONNECT_ACCOUNT_ID.trim())
+  ) {
+    return new ApiError(503, "Stripe Connect destination is invalid.", "backend_misconfigured");
   }
   return null;
 }

@@ -167,7 +167,6 @@ function health(request: Request, env: Env) {
       Boolean(account.private_key),
       Boolean(env.STRIPE_SECRET_KEY),
       Boolean(env.STRIPE_WEBHOOK_SECRET),
-      Boolean(env.STRIPE_CONNECT_ACCOUNT_ID),
       Boolean(env.PRINTIFY_API_TOKEN),
       Boolean(env.PRINTIFY_WEBHOOK_SECRET),
       Boolean(env.PRINTIFY_SHOP_ID),

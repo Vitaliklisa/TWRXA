@@ -4,7 +4,7 @@ export interface Env {
   GOOGLE_SERVICE_ACCOUNT_JSON: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
-  STRIPE_CONNECT_ACCOUNT_ID: string;
+  STRIPE_CONNECT_ACCOUNT_ID?: string;
   PRINTIFY_API_TOKEN: string;
   PRINTIFY_WEBHOOK_SECRET: string;
   PRINTIFY_SHOP_ID: string;

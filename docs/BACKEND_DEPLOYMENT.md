@@ -164,25 +164,27 @@ schedule on this Worker only; do not add separate cron triggers to endpoint
 environments.
 
 Set these **secrets** after the Worker has been deployed once. The service
-account JSON replaces the three `FIREBASE_ADMIN_*` Vercel variables; the
-connected account and cron secret are additional secrets needed by the Worker:
+account JSON replaces the three `FIREBASE_ADMIN_*` Vercel variables. The
+connected account is optional; the cron secret is required for scheduled sync:
 
-| Secret                        | Purpose                                                           |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Service account JSON for Firestore and Firebase Auth user lookup. |
-| `STRIPE_SECRET_KEY`           | Stripe secret API key. Use test mode first.                       |
-| `STRIPE_WEBHOOK_SECRET`       | Stripe webhook signing secret.                                    |
-| `STRIPE_CONNECT_ACCOUNT_ID`   | Destination account ID beginning `acct_`.                         |
-| `PRINTIFY_API_TOKEN`          | Server-only Printify API token.                                   |
-| `PRINTIFY_WEBHOOK_SECRET`     | Printify webhook HMAC secret.                                     |
-| `PRINTIFY_SHOP_ID`            | Numeric Printify shop ID.                                         |
-| `CRON_SECRET`                 | Bearer secret for scheduled/manual product sync.                  |
+| Secret                        | Purpose                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Service account JSON for Firestore and Firebase Auth user lookup.                        |
+| `STRIPE_SECRET_KEY`           | Stripe secret API key. Use test mode first.                                              |
+| `STRIPE_WEBHOOK_SECRET`       | Stripe webhook signing secret.                                                           |
+| `STRIPE_CONNECT_ACCOUNT_ID`   | Optional destination account for Connect split payments; omit for a single-seller store. |
+| `PRINTIFY_API_TOKEN`          | Server-only Printify API token.                                                          |
+| `PRINTIFY_WEBHOOK_SECRET`     | Printify webhook HMAC secret.                                                            |
+| `PRINTIFY_SHOP_ID`            | Numeric Printify shop ID.                                                                |
+| `CRON_SECRET`                 | Bearer secret for scheduled/manual product sync.                                         |
 
 `APP_BASE_URL`, `APP_ALLOWED_ORIGINS`, `PRODUCT_CURRENCY`, `CHECKOUT_ALLOWED_COUNTRIES`,
 `FLAT_SHIPPING_AMOUNT_CENTS`, and `STRIPE_APPLICATION_FEE_BPS` are ordinary
-Worker variables in `wrangler.toml`. The production storefront origin must
-match `APP_BASE_URL` or be listed exactly in `APP_ALLOWED_ORIGINS` for browser
-CORS. Add any preview origin explicitly; wildcard origins are not accepted.
+Worker variables in `wrangler.toml`. Application fees are only sent when a
+distinct Connect destination account is configured. The production storefront
+origin must match `APP_BASE_URL` or be listed exactly in `APP_ALLOWED_ORIGINS`
+for browser CORS. Add any preview origin explicitly; wildcard origins are not
+accepted.
 The Vercel web build accepts `API_BASE_URL` to override the default API
 hostname for preview environments.
 
