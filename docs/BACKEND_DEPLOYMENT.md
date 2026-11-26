@@ -109,7 +109,9 @@ Color/size combinations are active only when each combination maps to one
 unique Printify variant. Products with other ambiguous option dimensions
 remain inactive rather than risking the wrong fulfillment item. Legacy
 `printifyVariants` and `printifyVariantPrices` fields are also written for
-compatibility.
+compatibility. After deploying changes to option mapping, run a full product
+sync so existing Firestore documents replace numeric option IDs with their
+Printify display names.
 
 After setting environment variables and deploying, run a sync in a protected
 terminal:

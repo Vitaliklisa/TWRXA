@@ -67,6 +67,26 @@ test("maps color and size combinations to unique active Printify variants", () =
   );
 });
 
+test("resolves keyed Printify option IDs to their display titles", () => {
+  const product = {
+    ...colorSizeProduct(),
+    variants: [
+      {
+        id: 105,
+        price: 2500,
+        is_enabled: true,
+        options: { color: "2", size: "11" },
+      },
+    ],
+  };
+  const result = mapPrintifyProduct(product, { currency: "usd" });
+
+  assert.deepEqual(
+    result.document.variantMatrix.map(({ color, size }) => ({ color, size })),
+    [{ color: "White", size: "M" }],
+  );
+});
+
 test("keeps products inactive when two variants cannot be selected by color and size", () => {
   const product = colorSizeProduct();
   product.variants.push({

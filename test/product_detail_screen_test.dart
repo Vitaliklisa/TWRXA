@@ -137,7 +137,7 @@ void main() {
     await tester.tap(find.text('CLOSE'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('product-variant-M')));
+    await tester.tap(find.byKey(const ValueKey('product-size-M')));
     await tester.pumpAndSettle();
     expect(find.text('\$28.00'), findsOneWidget);
     await tester.tap(find.byTooltip('Increase quantity'));
@@ -178,12 +178,14 @@ void main() {
           'Black / M': 102,
           'White / S': 103,
           'White / M': 104,
+          'White / 5XL': 105,
         },
         'printifyVariantPrices': {
           'Black / S': 2500,
           'Black / M': 2800,
           'White / S': 2500,
           'White / M': 2800,
+          'White / 5XL': 3200,
         },
         'variantMatrix': [
           {
@@ -214,6 +216,13 @@ void main() {
             'printifyVariantId': 104,
             'unitAmount': 2800,
           },
+          {
+            'variantKey': 'White / 5XL',
+            'color': 'White',
+            'size': '5XL',
+            'printifyVariantId': 105,
+            'unitAmount': 3200,
+          },
         ],
       });
 
@@ -240,12 +249,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(productCard);
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('product-color')), findsOneWidget);
+      expect(find.byKey(const ValueKey('product-color-label')), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('product-color')));
+      expect(find.text('Color: Black'), findsOneWidget);
+      expect(find.byKey(const ValueKey('product-color-Black')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('product-color-White')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('White').last);
-      await tester.pumpAndSettle();
+      expect(find.text('Color: White'), findsOneWidget);
+      expect(find.byKey(const ValueKey('product-size-5XL')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('product-size-S')));
       await tester.pumpAndSettle();
       expect(find.text('\$25.00'), findsOneWidget);

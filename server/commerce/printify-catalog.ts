@@ -32,27 +32,56 @@ type VariantEntry = {
   label: string;
 };
 
+type PrintifyOption = NonNullable<PrintifyProduct["options"]>[number];
+
+function normalizeOptionName(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, "")
+    .replace(/s$/, "");
+}
+
+function findProductOption(product: PrintifyProduct, name: string, index?: number) {
+  const normalizedName = normalizeOptionName(name);
+  const matchingOption = product.options?.find((option) =>
+    [option.name, option.type].some(
+      (candidate) => candidate && normalizeOptionName(candidate) === normalizedName,
+    ),
+  );
+  return matchingOption ?? (index === undefined ? undefined : product.options?.[index]);
+}
+
+function optionValueTitle(option: PrintifyOption | undefined, value: unknown) {
+  let optionId = value;
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    if ("title" in value && typeof value.title === "string") return value.title;
+    if ("id" in value) optionId = value.id;
+  }
+  const match = option?.values?.find((item) => String(item.id) === String(optionId));
+  return String(match?.title ?? optionId);
+}
+
 function optionPairs(product: PrintifyProduct, variant: PrintifyVariant): OptionPair[] {
   if (Array.isArray(variant.options)) {
     return variant.options.map((optionId, index) => {
       const option = product.options?.[index];
-      const match = option?.values?.find((value) => String(value.id) === String(optionId));
       return {
         name: String(option?.name ?? option?.type ?? `Option ${index + 1}`),
         type: String(option?.type ?? ""),
-        value: String(match?.title ?? optionId),
+        value: optionValueTitle(option, optionId),
       };
     });
   }
-  if (variant.options && typeof variant.options === "object") {
-    return Object.entries(variant.options).map(([name, value]) => ({
-      name,
-      type: name,
-      value:
-        value && typeof value === "object" && "title" in value
-          ? String(value.title)
-          : String(value),
-    }));
+  if (variant.options && typeof variant.options === "object" && !Array.isArray(variant.options)) {
+    return Object.entries(variant.options).map(([name, value], index) => {
+      const option = findProductOption(product, name, index);
+      return {
+        name: String(option?.name ?? name),
+        type: String(option?.type ?? name),
+        value: optionValueTitle(option, value),
+      };
+    });
   }
   return [];
 }

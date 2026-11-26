@@ -11,14 +11,14 @@ describe("Printify catalog mapping", () => {
         visible: true,
         options: [
           {
-            name: "Color",
+            name: "Bella + Canvas Colors",
             type: "color",
-            values: [{ id: 15, title: "Black" }],
+            values: [{ id: 13, title: "White" }],
           },
           {
-            name: "Size",
+            name: "Clothing sizes",
             type: "size",
-            values: [{ id: 874, title: "S" }],
+            values: [{ id: 874, title: "L" }],
           },
         ],
         variants: [
@@ -26,7 +26,7 @@ describe("Printify catalog mapping", () => {
             id: 1001,
             price: 2500,
             is_enabled: true,
-            options: { color: "15", size: "874" },
+            options: { color: "13", size: "874" },
           },
         ],
       },
@@ -35,9 +35,9 @@ describe("Printify catalog mapping", () => {
 
     expect(mapped.document.variantMatrix).toEqual([
       {
-        variantKey: "S",
-        color: "Black",
-        size: "S",
+        variantKey: "L",
+        color: "White",
+        size: "L",
         printifyVariantId: 1001,
         unitAmount: 2500,
         priceCents: 2500,

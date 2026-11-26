@@ -20,6 +20,36 @@ const _accent = Color(0xFF39FF14);
 const _muted = Color(0xFF9BA69E);
 const _line = Color(0xFF28312B);
 
+Color _swatchColor(String name) {
+  final normalized = name.trim().toLowerCase();
+  final hex = RegExp(r'^#?([0-9a-f]{6})$').firstMatch(normalized);
+  if (hex != null) {
+    return Color(0xFF000000 | int.parse(hex.group(1)!, radix: 16));
+  }
+  if (normalized.contains('white') || normalized.contains('cream')) {
+    return const Color(0xFFF8F7F2);
+  }
+  if (normalized.contains('black') || normalized.contains('charcoal')) {
+    return const Color(0xFF171917);
+  }
+  if (normalized.contains('navy')) return const Color(0xFF192A4A);
+  if (normalized.contains('blue')) return const Color(0xFF3887C7);
+  if (normalized.contains('red')) return const Color(0xFFD63838);
+  if (normalized.contains('green')) return const Color(0xFF4E9A64);
+  if (normalized.contains('yellow')) return const Color(0xFFF2D34F);
+  if (normalized.contains('orange')) return const Color(0xFFE98236);
+  if (normalized.contains('pink')) return const Color(0xFFE98AA8);
+  if (normalized.contains('purple')) return const Color(0xFF8C5BB5);
+  if (normalized.contains('brown')) return const Color(0xFF795438);
+  if (normalized.contains('grey') || normalized.contains('gray')) {
+    return const Color(0xFF858A88);
+  }
+  if (normalized.contains('natural') || normalized.contains('sand')) {
+    return const Color(0xFFD9CBB0);
+  }
+  return const Color(0xFF727A75);
+}
+
 class ProductDetailScreen extends ConsumerStatefulWidget {
   const ProductDetailScreen({
     required this.productId,
@@ -234,8 +264,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     final hasVariants =
         product.variantMatrix.isNotEmpty || product.printifyVariants.isNotEmpty;
     final purchasable = product.active && hasVariants;
+    final colorOptions = product.colorOptions;
+    final sizeOptions = product.sizeOptionsForColor(_resolvedColor(product));
     final onlySizeKeys = keys.isNotEmpty &&
         keys.every((key) => const {
+              'XXS',
               'XS',
               'S',
               'M',
@@ -244,6 +277,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               '2XL',
               '3XL',
               '4XL',
+              '5XL',
             }.contains(key.toUpperCase()));
 
     return Column(
@@ -262,171 +296,130 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         Text(
           product.name,
           style: const TextStyle(
-            fontSize: 32,
+            fontSize: 29,
             height: 1.05,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 16),
-        Container(
-          key: const ValueKey('product-detail-price'),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A211D),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _line),
-          ),
-          child: Text(
-            _formatPrice(product, unitAmount),
-            style: const TextStyle(
-              color: _accent,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
         Text(
-          product.description.isEmpty
-              ? 'Made for everyday wear and long nights out.'
-              : product.description,
-          style: const TextStyle(color: _muted, height: 1.65),
-        ),
-        const SizedBox(height: 20),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            OutlinedButton.icon(
-              key: const ValueKey('product-size-guide'),
-              onPressed: () => _showSizeGuide(product),
-              icon: const Icon(Icons.straighten_rounded, size: 17),
-              label: const Text('Size Grid'),
-              style: _guideButtonStyle,
-            ),
-            OutlinedButton.icon(
-              key: const ValueKey('product-care-guide'),
-              onPressed: _showCareInstructions,
-              icon: const Icon(Icons.local_laundry_service_outlined, size: 17),
-              label: const Text('Taking Care of the Item'),
-              style: _guideButtonStyle,
-            ),
-          ],
+          _formatPrice(product, unitAmount),
+          key: const ValueKey('product-detail-price'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 23,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         if (product.variantMatrix.isNotEmpty) ...[
-          if (product.colorOptions.isNotEmpty) ...[
-            const SizedBox(height: 32),
-            const Text(
-              'SELECT COLOR',
-              style: TextStyle(
-                color: _muted,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: const ValueKey('product-color'),
-              value: _resolvedColor(product),
-              items: [
-                for (final color in product.colorOptions)
-                  DropdownMenuItem(value: color, child: Text(color)),
-              ],
-              onChanged: purchasable && product.colorOptions.length > 1
-                  ? (value) => setState(() {
-                        _selectedColor = value;
-                        final sizes = product.sizeOptionsForColor(value);
-                        if (!sizes.contains(_selectedSize)) {
-                          _selectedSize = sizes.contains('M')
-                              ? 'M'
-                              : sizes.isEmpty
-                                  ? null
-                                  : sizes.first;
-                        }
-                      })
-                  : null,
-            ),
-          ],
-          if (product
-              .sizeOptionsForColor(_resolvedColor(product))
-              .isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const Text(
-              'SELECT SIZE',
-              style: TextStyle(
-                color: _muted,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-              ),
+          if (colorOptions.isNotEmpty) ...[
+            const SizedBox(height: 30),
+            Text(
+              'Color: ${_resolvedColor(product)}',
+              key: const ValueKey('product-color-label'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
             Wrap(
-              spacing: 9,
-              runSpacing: 9,
+              spacing: 12,
+              runSpacing: 10,
               children: [
-                for (final size
-                    in product.sizeOptionsForColor(_resolvedColor(product)))
-                  ChoiceChip(
-                    key: ValueKey('product-size-$size'),
-                    label: Text(size),
+                for (final color in colorOptions)
+                  _colorSwatch(
+                    product,
+                    color,
+                    enabled: purchasable && colorOptions.length > 1,
+                  ),
+              ],
+            ),
+          ],
+          if (sizeOptions.isNotEmpty) ...[
+            const SizedBox(height: 26),
+            Text(
+              'Size: ${_resolvedSize(product)}',
+              key: const ValueKey('product-size-label'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final size in sizeOptions)
+                  _sizeOptionButton(
+                    size,
                     selected: _resolvedSize(product) == size,
-                    onSelected: purchasable
-                        ? (_) => setState(() => _selectedSize = size)
+                    onPressed: purchasable
+                        ? () => setState(() => _selectedSize = size)
                         : null,
-                    selectedColor: _accent,
-                    backgroundColor: const Color(0xFF1A211D),
-                    side: BorderSide(
-                      color: _resolvedSize(product) == size ? _accent : _line,
-                    ),
-                    labelStyle: TextStyle(
-                      color: _resolvedSize(product) == size
-                          ? _background
-                          : Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
                   ),
               ],
             ),
           ],
         ] else if (keys.isNotEmpty) ...[
-          const SizedBox(height: 32),
+          const SizedBox(height: 26),
           Text(
-            onlySizeKeys ? 'SELECT SIZE' : 'SELECT OPTION',
-            style: const TextStyle(
-              color: _muted,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
-            ),
+            onlySizeKeys ? 'Size: $variant' : 'Select option: $variant',
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
           Wrap(
-            spacing: 9,
-            runSpacing: 9,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               for (final key in keys)
-                ChoiceChip(
-                  key: ValueKey('product-variant-$key'),
-                  label: Text(key),
-                  selected: variant == key,
-                  onSelected: purchasable
-                      ? (_) => setState(() => _selectedVariant = key)
-                      : null,
-                  selectedColor: _accent,
-                  backgroundColor: const Color(0xFF1A211D),
-                  side: BorderSide(color: variant == key ? _accent : _line),
-                  labelStyle: TextStyle(
-                    color: variant == key ? _background : Colors.white,
-                    fontWeight: FontWeight.w800,
+                if (onlySizeKeys)
+                  _sizeOptionButton(
+                    key,
+                    selected: variant == key,
+                    onPressed: purchasable
+                        ? () => setState(() => _selectedVariant = key)
+                        : null,
+                  )
+                else
+                  ChoiceChip(
+                    key: ValueKey('product-variant-$key'),
+                    label: Text(key),
+                    selected: variant == key,
+                    onSelected: purchasable
+                        ? (_) => setState(() => _selectedVariant = key)
+                        : null,
+                    selectedColor: _accent,
+                    backgroundColor: const Color(0xFF1A211D),
+                    side: BorderSide(color: variant == key ? _accent : _line),
+                    labelStyle: TextStyle(
+                      color: variant == key ? _background : Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
             ],
           ),
         ],
-        const SizedBox(height: 30),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            TextButton(
+              key: const ValueKey('product-size-guide'),
+              onPressed: () => _showSizeGuide(product),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              child: const Text(
+                'Size guide',
+                style: TextStyle(decoration: TextDecoration.underline),
+              ),
+            ),
+            TextButton.icon(
+              key: const ValueKey('product-care-guide'),
+              onPressed: _showCareInstructions,
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              icon: const Icon(Icons.local_laundry_service_outlined, size: 17),
+              label: const Text('Taking Care of the Item'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
         Row(
           children: [
             const Expanded(
@@ -476,7 +469,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 18),
         SizedBox(
           width: double.infinity,
           height: 54,
@@ -512,15 +505,113 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(color: _muted, fontSize: 11),
         ),
+        const SizedBox(height: 34),
+        const Text(
+          'About the product',
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          product.description.isEmpty
+              ? 'Made for everyday wear and long nights out.'
+              : product.description,
+          style: const TextStyle(color: _muted, height: 1.65),
+        ),
       ],
     );
   }
 
-  ButtonStyle get _guideButtonStyle => OutlinedButton.styleFrom(
-        foregroundColor: Colors.white,
-        side: const BorderSide(color: _line),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+  Widget _colorSwatch(
+    StoreProduct product,
+    String color, {
+    required bool enabled,
+  }) {
+    final selected = _resolvedColor(product) == color;
+    final swatch = _swatchColor(color);
+    return Semantics(
+      label: 'Color: $color',
+      button: enabled,
+      selected: selected,
+      child: InkWell(
+        key: ValueKey('product-color-$color'),
+        onTap: enabled ? () => _selectColor(product, color) : null,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: 44,
+          height: 44,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? Colors.white : _line,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: swatch,
+              shape: BoxShape.circle,
+              border: Border.all(color: _line.withValues(alpha: 0.7)),
+            ),
+            child: selected
+                ? Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: swatch.computeLuminance() > 0.55
+                        ? Colors.black
+                        : Colors.white,
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sizeOptionButton(
+    String size, {
+    required bool selected,
+    required VoidCallback? onPressed,
+  }) =>
+      SizedBox(
+        width: 52,
+        height: 42,
+        child: OutlinedButton(
+          key: ValueKey('product-size-$size'),
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
+            side: BorderSide(
+              color: selected ? Colors.white : _line,
+              width: selected ? 2 : 1,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          child: Text(
+            size,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
       );
+
+  void _selectColor(StoreProduct product, String color) {
+    setState(() {
+      _selectedColor = color;
+      final sizes = product.sizeOptionsForColor(color);
+      if (!sizes.contains(_selectedSize)) {
+        _selectedSize = sizes.contains('M')
+            ? 'M'
+            : sizes.isEmpty
+                ? null
+                : sizes.first;
+      }
+    });
+  }
 
   Widget _recommendedProducts(StoreProduct product) {
     final catalog = ref.watch(storeProductsProvider);

@@ -66,7 +66,18 @@ class StoreProduct {
         .whereType<String>()
         .toSet()
         .toList();
-    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+    const sizeOrder = [
+      'XXS',
+      'XS',
+      'S',
+      'M',
+      'L',
+      'XL',
+      '2XL',
+      '3XL',
+      '4XL',
+      '5XL',
+    ];
     sizes.sort((left, right) {
       final leftRank = sizeOrder.indexOf(left.toUpperCase());
       final rightRank = sizeOrder.indexOf(right.toUpperCase());
@@ -85,7 +96,18 @@ class StoreProduct {
         .whereType<String>()
         .toSet()
         .toList();
-    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+    const sizeOrder = [
+      'XXS',
+      'XS',
+      'S',
+      'M',
+      'L',
+      'XL',
+      '2XL',
+      '3XL',
+      '4XL',
+      '5XL',
+    ];
     sizes.sort((left, right) {
       final leftRank = sizeOrder.indexOf(left.toUpperCase());
       final rightRank = sizeOrder.indexOf(right.toUpperCase());
@@ -109,7 +131,18 @@ class StoreProduct {
 
   List<String> get variantKeys {
     final keys = printifyVariants.keys.toList();
-    const sizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+    const sizes = [
+      'XXS',
+      'XS',
+      'S',
+      'M',
+      'L',
+      'XL',
+      '2XL',
+      '3XL',
+      '4XL',
+      '5XL',
+    ];
     keys.sort((left, right) {
       final leftRank = sizes.indexOf(left.toUpperCase());
       final rightRank = sizes.indexOf(right.toUpperCase());
@@ -251,13 +284,15 @@ class StoreProductVariant {
 
 bool _isSize(String value) => const {
       'XS',
+      'XXS',
       'S',
       'M',
       'L',
       'XL',
       '2XL',
       '3XL',
-      '4XL'
+      '4XL',
+      '5XL',
     }.contains(value.toUpperCase());
 
 DateTime? _readDate(Object? value) {
