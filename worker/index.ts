@@ -698,8 +698,11 @@ async function scheduledSync(env: Env) {
   console.log("[scheduled-sync] completed", result);
 }
 
-function checkoutHandler(request: Request, env: Env) {
-  return safeRoute("checkout-session", request, env, () => checkout(request, env));
+async function checkoutHandler(request: Request, env: Env) {
+  const response = await safeRoute("checkout-session", request, env, () =>
+    checkout(request, env),
+  );
+  return withCorsHeaders(response, request, env);
 }
 
 function stripeWebhookHandler(request: Request, env: Env) {

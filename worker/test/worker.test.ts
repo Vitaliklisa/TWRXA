@@ -527,6 +527,13 @@ describe("Cloudflare commerce API", () => {
     const printifyItems = decodeValue(orderFields.printifyItems) as Array<Record<string, unknown>>;
 
     expect(response.status).toBe(201);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://twrxa.khomenko.de",
+    );
+    expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
+    expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
+      "Authorization, Content-Type",
+    );
     expect(body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_worker123");
     expect(body.orderId).toMatch(/^[A-Za-z0-9_-]{10,64}$/);
     expect(printifyItems[0].variant_id).toBe(104);
@@ -538,6 +545,29 @@ describe("Cloudflare commerce API", () => {
       false,
     );
     expect(services.stripeForms[0].has("payment_intent_data[application_fee_amount]")).toBe(false);
+  });
+
+  it("answers checkout preflight requests with allowlisted CORS headers", async () => {
+    const response = await worker.fetch(
+      new Request("https://api.twrxa.khomenko.de/api/checkout-session", {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://twrxa.khomenko.de",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "authorization,content-type",
+        },
+      }),
+      makeEnv(),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://twrxa.khomenko.de",
+    );
+    expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
+    expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
+      "Authorization, Content-Type",
+    );
   });
 
   it("adds Connect destination and fee only for a separate account", async () => {
