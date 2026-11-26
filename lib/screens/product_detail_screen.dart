@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -347,7 +349,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   : null,
             ),
           ],
-          if (product.sizeOptionsForColor(_resolvedColor(product)).isNotEmpty) ...[
+          if (product
+              .sizeOptionsForColor(_resolvedColor(product))
+              .isNotEmpty) ...[
             const SizedBox(height: 24),
             const Text(
               'SELECT SIZE',
@@ -478,8 +482,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           height: 54,
           child: FilledButton(
             key: const ValueKey('product-add-to-cart'),
-            onPressed:
-                !purchasable || _addingToCart || !_quantityInputValid
+            onPressed: !purchasable || _addingToCart || !_quantityInputValid
                 ? null
                 : () => _addToCart(product, variant, selectedMatrixVariant),
             style: FilledButton.styleFrom(
@@ -572,8 +575,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                       Icon(item.icon,
                                           size: 52, color: item.artColor),
                                 )
-                              : Icon(item.icon,
-                                  size: 52, color: item.artColor),
+                              : Icon(item.icon, size: 52, color: item.artColor),
                         ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -691,7 +693,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               ),
               _CareInstruction(
                 icon: Icons.air_outlined,
-                text: 'Tumble dry on low or hang to dry. Avoid ironing directly over the print.',
+                text:
+                    'Tumble dry on low or hang to dry. Avoid ironing directly over the print.',
               ),
             ],
           ),
@@ -799,8 +802,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       final item = CartItem(
         productId: product.id,
         name: product.name,
-        unitAmount: selectedMatrixVariant?.unitAmount ??
-            product.unitAmountFor(variant),
+        unitAmount:
+            selectedMatrixVariant?.unitAmount ?? product.unitAmountFor(variant),
         quantity: _quantity,
         currency: product.currency,
         variant: selectedMatrixVariant?.label ??
@@ -918,8 +921,10 @@ class _SizeDiagramPainter extends CustomPainter {
       Offset(size.width * 0.74, size.height * 0.85),
       measure,
     );
-    _drawDiagramLabel(canvas, 'A', Offset(size.width * 0.5, size.height * 0.51));
-    _drawDiagramLabel(canvas, 'B', Offset(size.width * 0.79, size.height * 0.58));
+    _drawDiagramLabel(
+        canvas, 'A', Offset(size.width * 0.5, size.height * 0.51));
+    _drawDiagramLabel(
+        canvas, 'B', Offset(size.width * 0.79, size.height * 0.58));
   }
 
   void _drawDiagramLabel(Canvas canvas, String label, Offset center) {
@@ -932,9 +937,10 @@ class _SizeDiagramPainter extends CustomPainter {
           fontWeight: FontWeight.w900,
         ),
       ),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     )..layout();
-    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+    painter.paint(
+        canvas, center - Offset(painter.width / 2, painter.height / 2));
   }
 
   @override

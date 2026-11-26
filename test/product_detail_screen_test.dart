@@ -109,17 +109,31 @@ void main() {
     expect(find.text('Recommended for purchase'), findsOneWidget);
     expect(find.byKey(const ValueKey('recommended-product-recommended-tee')),
         findsOneWidget);
-    await tester.ensureVisible(find.byKey(const ValueKey('product-size-guide')));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('product-size-guide')));
     await tester.tap(find.byKey(const ValueKey('product-size-guide')));
     await tester.pumpAndSettle();
-    expect(find.text('Size Grid'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Size Grid'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('Chest width'), findsOneWidget);
     await tester.tap(find.text('CLOSE'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const ValueKey('product-care-guide')));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('product-care-guide')));
     await tester.tap(find.byKey(const ValueKey('product-care-guide')));
     await tester.pumpAndSettle();
-    expect(find.text('Taking Care of the Item'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Taking Care of the Item'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('CLOSE'));
     await tester.pumpAndSettle();
 

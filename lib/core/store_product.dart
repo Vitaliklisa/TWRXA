@@ -175,12 +175,9 @@ class StoreProduct {
       price: price,
       currency: currency.toLowerCase(),
       createdAt: createdAt,
-      description:
-          _cleanProductDescription(
-            data['description'] is String
-                ? data['description'] as String
-                : '',
-          ),
+      description: _cleanProductDescription(
+        data['description'] is String ? data['description'] as String : '',
+      ),
       tag: data['tag'] is String && (data['tag'] as String).trim().isNotEmpty
           ? (data['tag'] as String).trim()
           : tags.isNotEmpty

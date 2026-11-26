@@ -80,8 +80,7 @@ class CartItem {
 
 @immutable
 class Cart {
-  Cart({Iterable<CartItem> items = const []})
-      : items = _validatedItems(items);
+  Cart({Iterable<CartItem> items = const []}) : items = _validatedItems(items);
 
   static final Cart empty = Cart();
 

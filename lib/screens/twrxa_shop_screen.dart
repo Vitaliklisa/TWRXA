@@ -538,13 +538,12 @@ class _TwrxaShopScreenState extends ConsumerState<TwrxaShopScreen> {
                                 ),
                                 IconButton(
                                   tooltip: 'Add one ${line.name}',
-                                  onPressed:
-                                      line.quantity < maxCartLineQuantity
-                                          ? () => _changeQuantity(
-                                                line.id,
-                                                line.quantity + 1,
-                                              )
-                                          : null,
+                                  onPressed: line.quantity < maxCartLineQuantity
+                                      ? () => _changeQuantity(
+                                            line.id,
+                                            line.quantity + 1,
+                                          )
+                                      : null,
                                   icon: const Icon(
                                     Icons.add_circle_outline_rounded,
                                     size: 19,
