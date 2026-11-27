@@ -33,6 +33,68 @@ type VariantEntry = {
   label: string;
 };
 
+const knownSizes = new Set([
+  "3xs",
+  "xxxs",
+  "2xs",
+  "xxs",
+  "xs",
+  "xsmall",
+  "extrasmall",
+  "s",
+  "small",
+  "m",
+  "medium",
+  "l",
+  "large",
+  "xl",
+  "xlarge",
+  "extralarge",
+  "2xlarge",
+  "2x",
+  "2xl",
+  "xxl",
+  "xxlarge",
+  "3xlarge",
+  "3x",
+  "3xl",
+  "xxxl",
+  "xxxlarge",
+  "4xlarge",
+  "4x",
+  "4xl",
+  "xxxxl",
+  "5xlarge",
+  "5x",
+  "5xl",
+  "xxxxxl",
+  "6xlarge",
+  "6x",
+  "6xl",
+  "xxxxxxl",
+  "onesize",
+  "osfm",
+]);
+
+function titleOptionPairs(title: string | undefined): OptionPair[] | null {
+  if (!title) return null;
+  const parts = title.split(/\s*\/\s*/).map((part) => part.trim());
+  if (parts.length !== 2 || parts.some((part) => !part)) return null;
+
+  const [first, second] = parts;
+  const normalizedFirst = first.toLowerCase().replace(/[\s_-]+/g, "");
+  const sizeFirst = knownSizes.has(normalizedFirst);
+  return sizeFirst
+    ? [
+        { name: "Color", type: "color", value: second },
+        { name: "Size", type: "size", value: first },
+      ]
+    : [
+        { name: "Color", type: "color", value: first },
+        { name: "Size", type: "size", value: second },
+      ];
+}
+
 function normalizeOptionName(name: string) {
   return name
     .trim()
@@ -113,7 +175,7 @@ function variantEntries(product: PrintifyProduct): VariantEntry[] {
         variant.price > 0,
     )
     .map((variant) => {
-      const pairs = optionPairs(product, variant);
+      const pairs = titleOptionPairs(variant.title) ?? optionPairs(product, variant);
       return {
         variant,
         pairs,

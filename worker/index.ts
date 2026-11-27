@@ -263,7 +263,6 @@ async function checkout(request: Request, env: Env) {
       uid: user.uid,
       ...(typeof user.email === "string" ? { email: user.email } : {}),
       lines,
-      shippingAmount,
       allowedCountries: countries,
       baseUrl,
       applicationFee: fee,

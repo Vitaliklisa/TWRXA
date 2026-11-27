@@ -86,6 +86,31 @@ describe("Printify catalog mapping", () => {
     ]);
   });
 
+  it("maps variant titles with either size-first or color-first ordering", () => {
+    const mapped = mapPrintifyProduct(
+      {
+        id: "shirt-with-title-options",
+        title: "Test Shirt",
+        visible: true,
+        variants: [
+          { id: 1151, title: "XS / White", price: 2500 },
+          { id: 1152, title: "M / Black", price: 2500 },
+          { id: 1153, title: "White / S", price: 2500 },
+          { id: 1154, title: "Navy / 2XL", price: 2500 },
+        ],
+      },
+      "USD",
+    );
+
+    expect(mapped.document.active).toBe(true);
+    expect(mapped.document.variantMatrix.map(({ color, size }) => [color, size])).toEqual([
+      ["White", "XS"],
+      ["Black", "M"],
+      ["White", "S"],
+      ["Navy", "2XL"],
+    ]);
+  });
+
   it("does not expose unresolved numeric option IDs as customer-facing labels", () => {
     const mapped = mapPrintifyProduct(
       {

@@ -577,6 +577,20 @@ describe("Cloudflare commerce API", () => {
     expect(services.stripeForms[0].get("shipping_address_collection[allowed_countries][0]")).toBe(
       "AD",
     );
+    expect(services.stripeForms[0].get("shipping_options[0][shipping_rate_data][type]")).toBe(
+      "fixed_amount",
+    );
+    expect(
+      services.stripeForms[0].get("shipping_options[0][shipping_rate_data][fixed_amount][amount]"),
+    ).toBe("0");
+    expect(
+      services.stripeForms[0].get(
+        "shipping_options[0][shipping_rate_data][fixed_amount][currency]",
+      ),
+    ).toBe("usd");
+    expect(
+      services.stripeForms[0].get("shipping_options[0][shipping_rate_data][display_name]"),
+    ).toBe("Free shipping");
     expect(services.stripeAccountLookups).toHaveLength(0);
     expect(services.stripeForms[0].has("payment_intent_data[transfer_data][destination]")).toBe(
       false,

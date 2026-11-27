@@ -124,7 +124,6 @@ export async function createCheckoutSession(
     uid: string;
     email?: string;
     lines: CheckoutLine[];
-    shippingAmount: number;
     allowedCountries: string[];
     baseUrl: string;
     applicationFee: number;
@@ -157,18 +156,9 @@ export async function createCheckoutSession(
     form.set(`shipping_address_collection[allowed_countries][${index}]`, country);
   });
   form.set("shipping_options[0][shipping_rate_data][type]", "fixed_amount");
-  form.set(
-    "shipping_options[0][shipping_rate_data][fixed_amount][amount]",
-    String(input.shippingAmount),
-  );
-  form.set(
-    "shipping_options[0][shipping_rate_data][fixed_amount][currency]",
-    input.lines[0].currency,
-  );
-  form.set(
-    "shipping_options[0][shipping_rate_data][display_name]",
-    input.shippingAmount === 0 ? "Free shipping" : "Standard shipping",
-  );
+  form.set("shipping_options[0][shipping_rate_data][fixed_amount][amount]", "0");
+  form.set("shipping_options[0][shipping_rate_data][fixed_amount][currency]", "usd");
+  form.set("shipping_options[0][shipping_rate_data][display_name]", "Free shipping");
   form.set("phone_number_collection[enabled]", "true");
   if (input.email) form.set("customer_email", input.email);
   form.set("metadata[orderId]", input.orderId);
