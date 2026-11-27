@@ -27,3 +27,4 @@ android/key.properties
 .idea/
 *.iml
 .DS_Store
+.vercel

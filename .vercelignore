@@ -1,0 +1,8 @@
+.dart_tool/
+android/
+build/
+coverage/
+dist/
+ios/
+node_modules/
+.wrangler/

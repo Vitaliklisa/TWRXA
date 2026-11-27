@@ -154,6 +154,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Chest width'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('product-size-guide-image')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('CLOSE'));
     await tester.pumpAndSettle();
     await tester

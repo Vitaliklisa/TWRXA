@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -723,14 +721,22 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  height: 190,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: _background,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _line),
                   ),
-                  child: const CustomPaint(painter: _SizeDiagramPainter()),
+                  clipBehavior: Clip.antiAlias,
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Image.asset(
+                      'assets/images/size-guide.png',
+                      key: const ValueKey('product-size-guide-image'),
+                      fit: BoxFit.contain,
+                      semanticLabel: 'T-shirt size measurement diagram',
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 const Text(
@@ -967,122 +973,6 @@ class _CareInstruction extends StatelessWidget {
           ],
         ),
       );
-}
-
-class _SizeDiagramPainter extends CustomPainter {
-  const _SizeDiagramPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final shirtLeft = size.width * 0.12;
-    final shirtTop = size.height * 0.1;
-    final shirtWidth = size.width * 0.42;
-    final shirtHeight = size.height * 0.82;
-    Offset shirtPoint(double x, double y) => Offset(
-          shirtLeft + shirtWidth * x,
-          shirtTop + shirtHeight * y,
-        );
-
-    final shirt = Path()
-      ..moveTo(shirtPoint(0.38, 0.08).dx, shirtPoint(0.38, 0.08).dy)
-      ..lineTo(shirtPoint(0.28, 0.12).dx, shirtPoint(0.28, 0.12).dy)
-      ..lineTo(shirtPoint(0.06, 0.28).dx, shirtPoint(0.06, 0.28).dy)
-      ..lineTo(shirtPoint(0.15, 0.47).dx, shirtPoint(0.15, 0.47).dy)
-      ..lineTo(shirtPoint(0.27, 0.37).dx, shirtPoint(0.27, 0.37).dy)
-      ..lineTo(shirtPoint(0.27, 0.9).dx, shirtPoint(0.27, 0.9).dy)
-      ..lineTo(shirtPoint(0.73, 0.9).dx, shirtPoint(0.73, 0.9).dy)
-      ..lineTo(shirtPoint(0.73, 0.37).dx, shirtPoint(0.73, 0.37).dy)
-      ..lineTo(shirtPoint(0.85, 0.47).dx, shirtPoint(0.85, 0.47).dy)
-      ..lineTo(shirtPoint(0.94, 0.28).dx, shirtPoint(0.94, 0.28).dy)
-      ..lineTo(shirtPoint(0.72, 0.12).dx, shirtPoint(0.72, 0.12).dy)
-      ..lineTo(shirtPoint(0.62, 0.08).dx, shirtPoint(0.62, 0.08).dy)
-      ..quadraticBezierTo(
-        shirtPoint(0.5, 0.25).dx,
-        shirtPoint(0.5, 0.25).dy,
-        shirtPoint(0.38, 0.08).dx,
-        shirtPoint(0.38, 0.08).dy,
-      )
-      ..close();
-    final outline = Paint()
-      ..color = Colors.white70
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-    final measure = Paint()
-      ..color = _accent
-      ..strokeWidth = 1.8;
-    canvas.drawPath(
-      shirt,
-      Paint()
-        ..color = _panel
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawPath(shirt, outline);
-
-    final chestLeft = shirtPoint(0.27, 0.51);
-    final chestRight = shirtPoint(0.73, 0.51);
-    final chestCenter = Offset(
-      (chestLeft.dx + chestRight.dx) / 2,
-      chestLeft.dy,
-    );
-    canvas
-      ..drawLine(
-        chestLeft.translate(7, 0),
-        chestCenter.translate(-11, 0),
-        measure,
-      )
-      ..drawLine(
-        chestCenter.translate(11, 0),
-        chestRight.translate(-7, 0),
-        measure,
-      );
-    _drawArrowHead(canvas, chestLeft, const Offset(-1, 0));
-    _drawArrowHead(canvas, chestRight, const Offset(1, 0));
-    _drawDiagramLabel(canvas, 'A', chestCenter.translate(0, -15));
-
-    final lengthX = size.width * 0.68;
-    final lengthTop = Offset(lengthX, shirtPoint(0, 0.34).dy);
-    final lengthBottom = Offset(lengthX, shirtPoint(0, 0.9).dy);
-    canvas.drawLine(
-        lengthTop.translate(0, 7), lengthBottom.translate(0, -7), measure);
-    _drawArrowHead(canvas, lengthTop, const Offset(0, -1));
-    _drawArrowHead(canvas, lengthBottom, const Offset(0, 1));
-    _drawDiagramLabel(
-      canvas,
-      'B',
-      Offset(lengthX + 13, (lengthTop.dy + lengthBottom.dy) / 2),
-    );
-  }
-
-  void _drawArrowHead(Canvas canvas, Offset tip, Offset direction) {
-    final normal = Offset(-direction.dy, direction.dx);
-    final base = tip - direction * 7;
-    final path = Path()
-      ..moveTo(tip.dx, tip.dy)
-      ..lineTo(base.dx + normal.dx * 3.5, base.dy + normal.dy * 3.5)
-      ..lineTo(base.dx - normal.dx * 3.5, base.dy - normal.dy * 3.5)
-      ..close();
-    canvas.drawPath(path, Paint()..color = _accent);
-  }
-
-  void _drawDiagramLabel(Canvas canvas, String label, Offset center) {
-    canvas.drawCircle(center, 9, Paint()..color = _accent);
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: const TextStyle(
-          color: _background,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      textDirection: ui.TextDirection.ltr,
-    )..layout();
-    painter.paint(
-        canvas, center - Offset(painter.width / 2, painter.height / 2));
-  }
-
-  @override
-  bool shouldRepaint(covariant _SizeDiagramPainter oldDelegate) => false;
 }
 
 class _ProductStateMessage extends StatelessWidget {
