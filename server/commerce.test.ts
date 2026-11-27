@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   checkoutVariantMapping,
   normalizeCartItems,
+  parseAllowedCountries,
   productForCheckout,
 } from "./commerce/checkout.ts";
 import { mapPrintifyProduct } from "./commerce/printify-catalog.ts";
@@ -43,6 +44,16 @@ function colorSizeProduct() {
     ],
   };
 }
+
+test("defaults shipping to Stripe-supported international countries", () => {
+  const countries = parseAllowedCountries();
+
+  assert.ok(countries.includes("GB"));
+  assert.ok(countries.includes("AU"));
+  assert.ok(countries.includes("JP"));
+  assert.ok(!countries.includes("AS"));
+  assert.throws(() => parseAllowedCountries("US,AS"));
+});
 
 test("maps color and size combinations to unique active Printify variants", () => {
   const result = mapPrintifyProduct(colorSizeProduct(), {
@@ -85,6 +96,28 @@ test("resolves keyed Printify option IDs to their display titles", () => {
     result.document.variantMatrix.map(({ color, size }) => ({ color, size })),
     [{ color: "White", size: "M" }],
   );
+});
+
+test("keeps products inactive when numeric Printify option IDs have no titles", () => {
+  const result = mapPrintifyProduct(
+    {
+      ...colorSizeProduct(),
+      variants: [
+        {
+          id: 105,
+          price: 2500,
+          is_enabled: true,
+          options: { color: "13", size: "874" },
+        },
+      ],
+    },
+    { currency: "usd" },
+  );
+
+  assert.equal(result.document.active, false);
+  assert.equal(result.document.variantMatrix[0]?.color, null);
+  assert.equal(result.document.variantMatrix[0]?.size, null);
+  assert.match(result.warnings.join(" "), /unresolved option IDs/);
 });
 
 test("keeps products inactive when two variants cannot be selected by color and size", () => {

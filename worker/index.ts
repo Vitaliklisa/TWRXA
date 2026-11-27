@@ -224,7 +224,7 @@ async function checkout(request: Request, env: Env) {
     throw new ApiError(503, "Stripe is not configured.", "backend_misconfigured");
   }
   const shippingAmount = flatShippingAmount(env.FLAT_SHIPPING_AMOUNT_CENTS ?? "0");
-  const countries = parseAllowedCountries(env.CHECKOUT_ALLOWED_COUNTRIES ?? "US,CA");
+  const countries = parseAllowedCountries(env.CHECKOUT_ALLOWED_COUNTRIES);
   const baseUrl = parseAppBaseUrl(env.APP_BASE_URL);
   const subtotal = checkedSubtotal(lines, shippingAmount);
   const fee = Math.floor(

@@ -190,9 +190,24 @@ class StoreProduct {
     final tags = data['tags'] is List
         ? (data['tags'] as List).whereType<String>().toList()
         : const <String>[];
-    final variants = _readIntMap(data['printifyVariants']);
-    final variantPrices = _readIntMap(data['printifyVariantPrices']);
-    final variantMatrix = _readVariantMatrix(data['variantMatrix']);
+    final storedVariants = _readIntMap(data['printifyVariants']);
+    final storedVariantPrices = _readIntMap(data['printifyVariantPrices']);
+    final rawVariantMatrix = data['variantMatrix'];
+    final variantMatrix = _readVariantMatrix(rawVariantMatrix);
+    final hasStoredVariantMatrix =
+        rawVariantMatrix is List && rawVariantMatrix.isNotEmpty;
+    final variants = hasStoredVariantMatrix
+        ? Map<String, int>.unmodifiable({
+            for (final variant in variantMatrix)
+              variant.variantKey: variant.printifyVariantId,
+          })
+        : storedVariants;
+    final variantPrices = hasStoredVariantMatrix
+        ? Map<String, int>.unmodifiable({
+            for (final variant in variantMatrix)
+              variant.variantKey: variant.unitAmount,
+          })
+        : storedVariantPrices;
     final category = _inferCategory(
       data['category'] is String ? data['category'] as String : '',
       name,
@@ -363,6 +378,7 @@ List<StoreProductVariant> _readVariantMatrix(Object? value) {
       throw const FormatException(
           'Product variant matrix contains an invalid entry.');
     }
+    if (_isRawPrintifyColorId(color) || _isRawPrintifySizeId(size)) continue;
     variants.add(
       StoreProductVariant(
         variantKey: variantKey,
@@ -375,6 +391,12 @@ List<StoreProductVariant> _readVariantMatrix(Object? value) {
   }
   return List<StoreProductVariant>.unmodifiable(variants);
 }
+
+bool _isRawPrintifyColorId(Object? value) =>
+    value is String && RegExp(r'^\d+$').hasMatch(value.trim());
+
+bool _isRawPrintifySizeId(Object? value) =>
+    value is String && (int.tryParse(value.trim()) ?? 0) > 100;
 
 String _inferCategory(
   String category,

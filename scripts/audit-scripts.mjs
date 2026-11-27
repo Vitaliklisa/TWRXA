@@ -8,11 +8,11 @@
 //
 //   node scripts/audit-scripts.mjs
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
-const SCRIPTS = 'scripts';
-const files = readdirSync(SCRIPTS).filter((f) => !f.startsWith('.'));
+const SCRIPTS = "scripts";
+const files = readdirSync(SCRIPTS).filter((f) => !f.startsWith("."));
 
 // Every place a script name can legitimately be referenced, kept SEPARATE.
 //
@@ -24,18 +24,17 @@ const files = readdirSync(SCRIPTS).filter((f) => !f.startsWith('.'));
 //
 // Each source is therefore read on its own.
 const SOURCES = [
-  'package.json',
-  '.github/workflows/ci.yml',
-  'firebase.json',
-  'README.md',
-  'CHECKLIST.md',
-  'pubspec.yaml',
+  "package.json",
+  ".github/workflows/ci.yml",
+  "firebase.json",
+  "README.md",
+  "pubspec.yaml",
 ];
 
 const texts = [];
 for (const source of SOURCES) {
   try {
-    texts.push({ source, text: readFileSync(source, 'utf8') });
+    texts.push({ source, text: readFileSync(source, "utf8") });
   } catch {
     // Not present; that is fine.
   }
@@ -47,7 +46,7 @@ const scripts = files.filter((f) => /\.(mjs|mts|html)$/.test(f));
 for (const file of scripts) {
   texts.push({
     source: `scripts/${file}`,
-    text: readFileSync(join(SCRIPTS, file), 'utf8'),
+    text: readFileSync(join(SCRIPTS, file), "utf8"),
   });
 }
 
@@ -61,8 +60,8 @@ for (const file of scripts) {
 //
 // Reporting these as orphans on every run is how a cleanup report trains you to
 // ignore it, so they are classified separately and never suggested for removal.
-const isPatternDiscovered = (f) => f.endsWith('.test.mjs');
-const isPathInvoked = (f) => f.endsWith('.sh') || f.endsWith('.d.mts');
+const isPatternDiscovered = (f) => f.endsWith(".test.mjs");
+const isPathInvoked = (f) => f.endsWith(".sh") || f.endsWith(".d.mts");
 
 const tests = [];
 const pathInvoked = [];
@@ -73,8 +72,7 @@ for (const file of files) {
   const mention = texts.find(
     (t) =>
       t.source !== `scripts/${file}` &&
-      (t.text.includes(file) ||
-        t.text.includes(file.replace(/\.(mjs|mts|html|sh)$/, ''))),
+      (t.text.includes(file) || t.text.includes(file.replace(/\.(mjs|mts|html|sh)$/, ""))),
   );
 
   if (mention) referenced.push({ file, via: mention.source });
@@ -86,9 +84,7 @@ for (const file of files) {
 console.log(`scripts/ contains ${files.length} files\n`);
 
 console.log(`REFERENCED (${referenced.length})`);
-for (const { file, via } of referenced.sort((a, b) =>
-  a.file.localeCompare(b.file),
-)) {
+for (const { file, via } of referenced.sort((a, b) => a.file.localeCompare(b.file))) {
   console.log(`  ${file.padEnd(34)} <- ${via}`);
 }
 
@@ -100,11 +96,11 @@ for (const f of pathInvoked.sort()) console.log(`  ${f}`);
 
 console.log(`\nPOSSIBLY DEAD (${orphans.length})`);
 if (orphans.length === 0) {
-  console.log('  (none)');
+  console.log("  (none)");
 } else {
   for (const f of orphans.sort()) console.log(`  ${f}`);
   console.log(
-    '\n  Verify each by hand before removing: `git log -1 -- scripts/<file>`\n' +
-      '  and a repo-wide search. This report is a hint, not a verdict.',
+    "\n  Verify each by hand before removing: `git log -1 -- scripts/<file>`\n" +
+      "  and a repo-wide search. This report is a hint, not a verdict.",
   );
 }

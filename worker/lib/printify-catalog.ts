@@ -23,7 +23,7 @@ export type PrintifyProduct = {
   variants?: PrintifyVariant[];
 };
 
-type OptionPair = { name: string; type: string; value: string };
+type OptionPair = { name: string; type: string; value: string | null };
 type PrintifyOption = NonNullable<PrintifyProduct["options"]>[number];
 type VariantEntry = {
   variant: PrintifyVariant;
@@ -54,11 +54,17 @@ function findProductOption(product: PrintifyProduct, name: string, index?: numbe
 function optionValueTitle(option: PrintifyOption | undefined, value: unknown) {
   let optionId = value;
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    if ("title" in value && typeof value.title === "string") return value.title;
+    if ("title" in value && typeof value.title === "string") {
+      return value.title.trim() || null;
+    }
     if ("id" in value) optionId = value.id;
   }
   const match = option?.values?.find((item) => String(item.id) === String(optionId));
-  return String(match?.title ?? optionId);
+  if (typeof match?.title === "string") return match.title.trim() || null;
+  if (typeof optionId === "string" && !/^\d+$/.test(optionId.trim())) {
+    return optionId.trim() || null;
+  }
+  return null;
 }
 
 function optionPairs(product: PrintifyProduct, variant: PrintifyVariant): OptionPair[] {
@@ -85,6 +91,15 @@ function optionPairs(product: PrintifyProduct, variant: PrintifyVariant): Option
   return [];
 }
 
+function hasUnresolvedOption(pair: OptionPair) {
+  const optionName = `${pair.name} ${pair.type}`;
+  if (!pair.value || !/colou?r|size/i.test(optionName)) return true;
+  return (
+    (/colou?r/i.test(optionName) && /^\d+$/.test(pair.value)) ||
+    (/size/i.test(optionName) && /^\d+$/.test(pair.value) && Number(pair.value) > 100)
+  );
+}
+
 function variantEntries(product: PrintifyProduct): VariantEntry[] {
   return (product.variants ?? [])
     .filter(
@@ -107,24 +122,24 @@ function variantEntries(product: PrintifyProduct): VariantEntry[] {
         label:
           pairs
             .map((pair) => pair.value)
-            .filter(Boolean)
+            .filter((value): value is string => value !== null)
             .join(" / ") || String(variant.title ?? variant.id),
       };
     });
 }
 
 function isSelectable(entries: VariantEntry[]) {
-  if (entries.length <= 1) return true;
+  if (entries.length === 0) return true;
   const signatures = new Set<string>();
   for (const entry of entries) {
     if (
-      entry.pairs.some((pair) => !/colou?r|size/i.test(`${pair.name} ${pair.type}`)) ||
-      (!entry.color && !entry.size)
+      entry.pairs.some(hasUnresolvedOption) ||
+      (entries.length > 1 && !entry.color && !entry.size)
     ) {
       return false;
     }
     const signature = `${entry.color ?? ""}\u0000${entry.size ?? ""}`;
-    if (signatures.has(signature)) return false;
+    if (entries.length > 1 && signatures.has(signature)) return false;
     signatures.add(signature);
   }
   return true;
@@ -197,8 +212,10 @@ export function mapPrintifyProduct(product: PrintifyProduct, currency: string, n
   const createdAt = Number.isFinite(createdAtValue) ? new Date(createdAtValue) : now;
   const warnings: string[] = [];
   if (entries.length === 0) warnings.push("No enabled variants with valid prices were returned.");
-  if (entries.length > 1 && !selectable) {
-    warnings.push("Variants contain choices outside the color/size selector; imported inactive.");
+  if (entries.length > 0 && !selectable) {
+    warnings.push(
+      "Variants contain choices outside the color/size selector or unresolved option IDs; imported inactive.",
+    );
   }
   if (product.visible !== true) warnings.push("Printify marks this product as not visible.");
 

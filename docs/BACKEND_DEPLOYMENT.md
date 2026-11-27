@@ -42,25 +42,25 @@ enabling checkout.
 Set these for the Vercel **server runtime** (Production and Preview as
 appropriate), then redeploy. Values are intentionally not included here.
 
-| Variable                       | Required | Purpose                                                                         |
-| ------------------------------ | -------- | ------------------------------------------------------------------------------- |
-| `FIREBASE_ADMIN_PROJECT_ID`    | Yes      | Must be `twrxa-shop`.                                                           |
-| `FIREBASE_ADMIN_CLIENT_EMAIL`  | Yes      | Firebase Admin service-account email.                                           |
-| `FIREBASE_ADMIN_PRIVATE_KEY`   | Yes      | Firebase Admin private key; preserve its newlines.                              |
-| `STRIPE_SECRET_KEY`            | Yes      | Stripe secret API key. Start with a test-mode key.                              |
-| `STRIPE_WEBHOOK_SECRET`        | Yes      | Signing secret for `/api/stripe-webhook`.                                       |
-| `STRIPE_CONNECT_ACCOUNT_ID`    | Yes      | Destination account ID beginning `acct_`.                                       |
-| `PRINTIFY_API_TOKEN`           | Yes      | Server-only Printify API token.                                                 |
-| `PRINTIFY_WEBHOOK_SECRET`      | Yes      | HMAC secret configured for Printify webhooks.                                   |
-| `PRINTIFY_SHOP_ID`             | Yes      | Numeric Printify shop ID.                                                       |
-| `APP_BASE_URL`                 | Yes      | HTTPS storefront base URL used for checkout returns.                            |
-| `CRON_SECRET`                  | Vercel rollback only | Bearer secret for sync when using the Vercel handlers.                     |
-| `PRODUCT_CURRENCY`             | No       | Three-letter currency; defaults to `USD`.                                       |
-| `CHECKOUT_ALLOWED_COUNTRIES`   | No       | Comma-separated ISO country codes; defaults to `US,CA`.                         |
-| `FLAT_SHIPPING_AMOUNT_CENTS`   | No       | Flat shipping amount in minor units; defaults to `0`.                           |
-| `STRIPE_APPLICATION_FEE_BPS`   | No       | Platform fee in basis points; defaults to `0`.                                  |
-| `FIREBASE_AUTH_DOMAIN`         | No       | Web build auth domain; defaults to `twrxa-shop.firebaseapp.com`.                |
-| `VERCEL_DEPLOYMENT_CREATED_AT` | No       | Optional timestamp supplied by your deployment automation for health reporting. |
+| Variable                       | Required             | Purpose                                                                                          |
+| ------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------ |
+| `FIREBASE_ADMIN_PROJECT_ID`    | Yes                  | Must be `twrxa-shop`.                                                                            |
+| `FIREBASE_ADMIN_CLIENT_EMAIL`  | Yes                  | Firebase Admin service-account email.                                                            |
+| `FIREBASE_ADMIN_PRIVATE_KEY`   | Yes                  | Firebase Admin private key; preserve its newlines.                                               |
+| `STRIPE_SECRET_KEY`            | Yes                  | Stripe secret API key. Start with a test-mode key.                                               |
+| `STRIPE_WEBHOOK_SECRET`        | Yes                  | Signing secret for `/api/stripe-webhook`.                                                        |
+| `STRIPE_CONNECT_ACCOUNT_ID`    | No                   | Optional destination account ID beginning `acct_`; omit for a single-seller store.               |
+| `PRINTIFY_API_TOKEN`           | Yes                  | Server-only Printify API token.                                                                  |
+| `PRINTIFY_WEBHOOK_SECRET`      | Yes                  | HMAC secret configured for Printify webhooks.                                                    |
+| `PRINTIFY_SHOP_ID`             | Yes                  | Numeric Printify shop ID.                                                                        |
+| `APP_BASE_URL`                 | Yes                  | HTTPS storefront base URL used for checkout returns.                                             |
+| `CRON_SECRET`                  | Vercel rollback only | Bearer secret for sync when using the Vercel handlers.                                           |
+| `PRODUCT_CURRENCY`             | No                   | Three-letter currency; defaults to `USD`.                                                        |
+| `CHECKOUT_ALLOWED_COUNTRIES`   | No                   | Optional comma-separated Stripe-supported ISO country codes; defaults to the international list. |
+| `FLAT_SHIPPING_AMOUNT_CENTS`   | No                   | Flat shipping amount in minor units; defaults to `0`.                                            |
+| `STRIPE_APPLICATION_FEE_BPS`   | No                   | Platform fee in basis points; defaults to `0`.                                                   |
+| `FIREBASE_AUTH_DOMAIN`         | No                   | Web build auth domain; defaults to `twrxa-shop.firebaseapp.com`.                                 |
+| `VERCEL_DEPLOYMENT_CREATED_AT` | No                   | Optional timestamp supplied by your deployment automation for health reporting.                  |
 
 `GET /api/health` returns HTTP 200 with the deployment timestamp (or `null`),
 latest product sync timestamp (or `null`), and `secretNamesPresent`, a boolean
@@ -72,8 +72,9 @@ Firebase project/account ID, or service-account data.
 
 - `POST /api/checkout-session` — requires a Firebase ID token. Reads product
   prices and Printify variant IDs from Firestore; ignores client-supplied
-  prices and user IDs; creates a Stripe Checkout Session with a Connect
-  destination charge.
+  prices and user IDs; creates a branded Stripe Checkout Session. A Connect
+  destination charge is only used when `STRIPE_CONNECT_ACCOUNT_ID` names a
+  separate account.
 - `POST /api/stripe-webhook` — verifies the raw request body against
   `STRIPE_WEBHOOK_SECRET`; on paid checkout events creates a Printify order
   with the verified shipping address and mapped product/variant/quantity,
@@ -95,6 +96,11 @@ Firebase project/account ID, or service-account data.
 - `GET /api/health` — reports configuration booleans and sync/deployment
   timestamps, never secret values.
 
+Stripe Checkout Sessions use Dashboard-managed dynamic payment methods; the
+Checkout Sessions API does not accept `automatic_payment_methods`. Apple Pay
+and Google Pay are offered when enabled for the Stripe account and eligible
+for the customer's browser, device, and domain.
+
 The Worker is on a dedicated API subdomain, so it allows browser requests only
 from `APP_BASE_URL`; it does not enable wildcard CORS. Webhook routes verify
 provider signatures over raw request bytes. Customer routes verify Firebase
@@ -107,11 +113,11 @@ The importer maps the available Printify variants into `variantMatrix` records
 containing color, size, Printify variant ID, and server-side unit amount.
 Color/size combinations are active only when each combination maps to one
 unique Printify variant. Products with other ambiguous option dimensions
-remain inactive rather than risking the wrong fulfillment item. Legacy
-`printifyVariants` and `printifyVariantPrices` fields are also written for
-compatibility. After deploying changes to option mapping, run a full product
-sync so existing Firestore documents replace numeric option IDs with their
-Printify display names.
+or unresolved numeric option IDs remain inactive rather than risking the wrong
+fulfillment item or showing IDs as customer-facing labels. Run a full product
+sync after deploying importer changes so existing Firestore documents are
+refreshed with resolved Printify display names. Legacy `printifyVariants` and
+`printifyVariantPrices` fields are also written for compatibility.
 
 After setting environment variables and deploying, run a sync in a protected
 terminal:
@@ -203,7 +209,6 @@ source control or chat:
 npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
 npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
-npx wrangler secret put STRIPE_CONNECT_ACCOUNT_ID
 npx wrangler secret put PRINTIFY_API_TOKEN
 npx wrangler secret put PRINTIFY_WEBHOOK_SECRET
 npx wrangler secret put PRINTIFY_SHOP_ID

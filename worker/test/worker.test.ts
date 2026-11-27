@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../index.ts";
 import type { Env } from "../types.ts";
+import { parseAllowedCountries } from "../lib/checkout.ts";
 import { setDocsBatch } from "../lib/firestore.ts";
 import { logGoogleResponseFailure } from "../lib/google.ts";
 import { verifyPrintifySignature } from "../lib/printify.ts";
@@ -142,7 +143,6 @@ function makeEnv(): Env {
     PRINTIFY_SHOP_ID: "123456",
     CRON_SECRET: "cron-secret-test-value",
     PRODUCT_CURRENCY: "USD",
-    CHECKOUT_ALLOWED_COUNTRIES: "US,CA",
     FLAT_SHIPPING_AMOUNT_CENTS: "0",
     STRIPE_APPLICATION_FEE_BPS: "0",
   };
@@ -422,6 +422,35 @@ describe("Firestore batch writes", () => {
 });
 
 describe("Cloudflare commerce API", () => {
+  it("uses supported international shipping countries and rejects unsupported codes", () => {
+    const countries = parseAllowedCountries();
+
+    expect(countries).toContain("GB");
+    expect(countries).toContain("AU");
+    expect(countries).toContain("JP");
+    expect(countries.length).toBeGreaterThan(100);
+    for (const country of [
+      "AS",
+      "CX",
+      "CC",
+      "CU",
+      "HM",
+      "IR",
+      "KP",
+      "MH",
+      "FM",
+      "NF",
+      "MP",
+      "PW",
+      "SY",
+      "UM",
+      "VI",
+    ]) {
+      expect(countries).not.toContain(country);
+      expect(() => parseAllowedCountries(`US,${country}`)).toThrow();
+    }
+  });
+
   it("returns the health response contract without exposing secret values", async () => {
     mockExternalServices();
     const response = await worker.fetch(
@@ -527,9 +556,7 @@ describe("Cloudflare commerce API", () => {
     const printifyItems = decodeValue(orderFields.printifyItems) as Array<Record<string, unknown>>;
 
     expect(response.status).toBe(201);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
-      "https://twrxa.khomenko.de",
-    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://twrxa.khomenko.de");
     expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
     expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
       "Authorization, Content-Type",
@@ -540,6 +567,16 @@ describe("Cloudflare commerce API", () => {
     expect(printifyItems[0].quantity).toBe(20);
     expect(services.stripeForms[0].get("line_items[0][price_data][unit_amount]")).toBe("2800");
     expect(services.stripeForms[0].get("metadata[uid]")).toBe("firebase-user-123");
+    expect(services.stripeForms[0].get("branding_settings[display_name]")).toBe("TWRXA Supply Co.");
+    expect(services.stripeForms[0].get("branding_settings[font_family]")).toBe("inter");
+    expect(services.stripeForms[0].get("branding_settings[background_color]")).toBe("#0A0A0A");
+    expect(services.stripeForms[0].get("branding_settings[button_color]")).toBe("#00FF00");
+    expect(services.stripeForms[0].get("branding_settings[border_style]")).toBe("rounded");
+    expect(services.stripeForms[0].has("automatic_payment_methods[enabled]")).toBe(false);
+    expect(services.stripeForms[0].has("payment_method_types[0]")).toBe(false);
+    expect(services.stripeForms[0].get("shipping_address_collection[allowed_countries][0]")).toBe(
+      "AD",
+    );
     expect(services.stripeAccountLookups).toHaveLength(0);
     expect(services.stripeForms[0].has("payment_intent_data[transfer_data][destination]")).toBe(
       false,
@@ -561,9 +598,7 @@ describe("Cloudflare commerce API", () => {
     );
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
-      "https://twrxa.khomenko.de",
-    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://twrxa.khomenko.de");
     expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
     expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
       "Authorization, Content-Type",
@@ -642,9 +677,7 @@ describe("Cloudflare commerce API", () => {
 
     expect(response.status).toBe(409);
     expect(body.error).toBe("variant_unavailable");
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
-      "https://twrxa.khomenko.de",
-    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://twrxa.khomenko.de");
     expect(logger).toHaveBeenCalledWith(
       "[checkout-session] handler failed",
       expect.objectContaining({ message: expect.stringContaining("variant") }),
@@ -693,9 +726,7 @@ describe("Cloudflare commerce API", () => {
     const body = (await response.json()) as { message: string };
 
     expect(response.status).toBe(500);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
-      "https://twrxa.khomenko.de",
-    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://twrxa.khomenko.de");
     expect(body.message).not.toContain("Stripe test failure");
     expect(logger).toHaveBeenCalledWith(
       "[checkout-session] Stripe Checkout session creation failed",

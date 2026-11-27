@@ -133,6 +133,11 @@ export async function createCheckoutSession(
   const form = new URLSearchParams();
   form.set("mode", "payment");
   form.set("client_reference_id", input.orderId);
+  form.set("branding_settings[display_name]", "TWRXA Supply Co.");
+  form.set("branding_settings[font_family]", "inter");
+  form.set("branding_settings[background_color]", "#0A0A0A");
+  form.set("branding_settings[button_color]", "#00FF00");
+  form.set("branding_settings[border_style]", "rounded");
   form.set(
     "success_url",
     `${input.baseUrl}/?checkout=success&order_id=${encodeURIComponent(input.orderId)}&session_id={CHECKOUT_SESSION_ID}`,

@@ -1,4 +1,8 @@
 import { ApiError, type JsonObject } from "./http.ts";
+import {
+  defaultCheckoutAllowedCountries,
+  stripeShippingCountryCodes,
+} from "../../shared/stripe-shipping-countries.ts";
 
 const maximumStripeAmount = 99_999_999;
 
@@ -177,15 +181,20 @@ export function productForCheckout(
   };
 }
 
-export function parseAllowedCountries(value = process.env.CHECKOUT_ALLOWED_COUNTRIES ?? "US,CA") {
-  const countries = value
-    .split(",")
-    .map((country) => country.trim().toUpperCase())
-    .filter(Boolean);
+export function parseAllowedCountries(
+  value = process.env.CHECKOUT_ALLOWED_COUNTRIES ?? defaultCheckoutAllowedCountries.join(","),
+) {
+  const countries = [
+    ...new Set(
+      value
+        .split(",")
+        .map((country) => country.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
   if (
     countries.length === 0 ||
-    countries.length > 100 ||
-    countries.some((country) => !/^[A-Z]{2}$/.test(country))
+    countries.some((country) => !stripeShippingCountryCodes.has(country))
   ) {
     throw new ApiError(
       503,
@@ -193,7 +202,7 @@ export function parseAllowedCountries(value = process.env.CHECKOUT_ALLOWED_COUNT
       "backend_misconfigured",
     );
   }
-  return [...new Set(countries)];
+  return countries;
 }
 
 export function parseAppBaseUrl(value = process.env.APP_BASE_URL ?? "") {

@@ -39,6 +39,39 @@ void main() {
     expect(product.description, isNot(contains('display:none')));
   });
 
+  test(
+      'legacy numeric Printify option IDs are not exposed as color or size labels',
+      () async {
+    final firestore = FakeFirebaseFirestore();
+    await firestore.collection('products').doc('numeric-options').set({
+      'active': true,
+      'name': 'Numeric Options Tee',
+      'category': 'T-SHIRTS',
+      'price': 2500,
+      'currency': 'usd',
+      'createdAt': Timestamp.fromDate(DateTime(2026, 8, 1)),
+      'printifyVariants': {'13 / 874': 101},
+      'printifyVariantPrices': {'13 / 874': 2500},
+      'variantMatrix': [
+        {
+          'variantKey': '13 / 874',
+          'color': '13',
+          'size': '874',
+          'printifyVariantId': 101,
+          'unitAmount': 2500,
+        },
+      ],
+    });
+
+    final product = StoreProduct.fromSnapshot(
+      await firestore.collection('products').doc('numeric-options').get(),
+    );
+
+    expect(product.colorOptions, isEmpty);
+    expect(product.sizeOptions, isEmpty);
+    expect(product.variantKeys, isEmpty);
+  });
+
   testWidgets(
       'a malformed product does not prevent a valid Firestore product from loading',
       (tester) async {
@@ -174,6 +207,7 @@ void main() {
         'currency': 'usd',
         'createdAt': Timestamp.fromDate(DateTime(2026, 8, 1)),
         'printifyVariants': {
+          'Black / XS': 106,
           'Black / S': 101,
           'Black / M': 102,
           'White / S': 103,
@@ -181,6 +215,7 @@ void main() {
           'White / 5XL': 105,
         },
         'printifyVariantPrices': {
+          'Black / XS': 2400,
           'Black / S': 2500,
           'Black / M': 2800,
           'White / S': 2500,
@@ -188,6 +223,13 @@ void main() {
           'White / 5XL': 3200,
         },
         'variantMatrix': [
+          {
+            'variantKey': 'Black / XS',
+            'color': 'Black',
+            'size': 'XS',
+            'printifyVariantId': 106,
+            'unitAmount': 2400,
+          },
           {
             'variantKey': 'Black / S',
             'color': 'Black',
@@ -253,6 +295,8 @@ void main() {
 
       expect(find.text('Color: Black'), findsOneWidget);
       expect(find.byKey(const ValueKey('product-color-Black')), findsOneWidget);
+      expect(find.byKey(const ValueKey('product-size-XS')), findsOneWidget);
+      expect(find.byKey(const ValueKey('product-size-M')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('product-color-White')));
       await tester.pumpAndSettle();
       expect(find.text('Color: White'), findsOneWidget);

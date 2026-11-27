@@ -974,57 +974,104 @@ class _SizeDiagramPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final shirtLeft = size.width * 0.12;
+    final shirtTop = size.height * 0.1;
+    final shirtWidth = size.width * 0.42;
+    final shirtHeight = size.height * 0.82;
+    Offset shirtPoint(double x, double y) => Offset(
+          shirtLeft + shirtWidth * x,
+          shirtTop + shirtHeight * y,
+        );
+
     final shirt = Path()
-      ..moveTo(size.width * 0.39, size.height * 0.16)
-      ..lineTo(size.width * 0.28, size.height * 0.22)
-      ..lineTo(size.width * 0.12, size.height * 0.38)
-      ..lineTo(size.width * 0.22, size.height * 0.51)
-      ..lineTo(size.width * 0.31, size.height * 0.43)
-      ..lineTo(size.width * 0.31, size.height * 0.87)
-      ..lineTo(size.width * 0.69, size.height * 0.87)
-      ..lineTo(size.width * 0.69, size.height * 0.43)
-      ..lineTo(size.width * 0.78, size.height * 0.51)
-      ..lineTo(size.width * 0.88, size.height * 0.38)
-      ..lineTo(size.width * 0.72, size.height * 0.22)
-      ..lineTo(size.width * 0.61, size.height * 0.16)
+      ..moveTo(shirtPoint(0.38, 0.08).dx, shirtPoint(0.38, 0.08).dy)
+      ..lineTo(shirtPoint(0.28, 0.12).dx, shirtPoint(0.28, 0.12).dy)
+      ..lineTo(shirtPoint(0.06, 0.28).dx, shirtPoint(0.06, 0.28).dy)
+      ..lineTo(shirtPoint(0.15, 0.47).dx, shirtPoint(0.15, 0.47).dy)
+      ..lineTo(shirtPoint(0.27, 0.37).dx, shirtPoint(0.27, 0.37).dy)
+      ..lineTo(shirtPoint(0.27, 0.9).dx, shirtPoint(0.27, 0.9).dy)
+      ..lineTo(shirtPoint(0.73, 0.9).dx, shirtPoint(0.73, 0.9).dy)
+      ..lineTo(shirtPoint(0.73, 0.37).dx, shirtPoint(0.73, 0.37).dy)
+      ..lineTo(shirtPoint(0.85, 0.47).dx, shirtPoint(0.85, 0.47).dy)
+      ..lineTo(shirtPoint(0.94, 0.28).dx, shirtPoint(0.94, 0.28).dy)
+      ..lineTo(shirtPoint(0.72, 0.12).dx, shirtPoint(0.72, 0.12).dy)
+      ..lineTo(shirtPoint(0.62, 0.08).dx, shirtPoint(0.62, 0.08).dy)
       ..quadraticBezierTo(
-        size.width * 0.5,
-        size.height * 0.34,
-        size.width * 0.39,
-        size.height * 0.16,
+        shirtPoint(0.5, 0.25).dx,
+        shirtPoint(0.5, 0.25).dy,
+        shirtPoint(0.38, 0.08).dx,
+        shirtPoint(0.38, 0.08).dy,
       )
       ..close();
     final outline = Paint()
       ..color = Colors.white70
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1.8;
     final measure = Paint()
       ..color = _accent
-      ..strokeWidth = 2;
+      ..strokeWidth = 1.8;
+    canvas.drawPath(
+      shirt,
+      Paint()
+        ..color = _panel
+        ..style = PaintingStyle.fill,
+    );
     canvas.drawPath(shirt, outline);
-    canvas.drawLine(
-      Offset(size.width * 0.32, size.height * 0.58),
-      Offset(size.width * 0.68, size.height * 0.58),
-      measure,
+
+    final chestLeft = shirtPoint(0.27, 0.51);
+    final chestRight = shirtPoint(0.73, 0.51);
+    final chestCenter = Offset(
+      (chestLeft.dx + chestRight.dx) / 2,
+      chestLeft.dy,
     );
+    canvas
+      ..drawLine(
+        chestLeft.translate(7, 0),
+        chestCenter.translate(-11, 0),
+        measure,
+      )
+      ..drawLine(
+        chestCenter.translate(11, 0),
+        chestRight.translate(-7, 0),
+        measure,
+      );
+    _drawArrowHead(canvas, chestLeft, const Offset(-1, 0));
+    _drawArrowHead(canvas, chestRight, const Offset(1, 0));
+    _drawDiagramLabel(canvas, 'A', chestCenter.translate(0, -15));
+
+    final lengthX = size.width * 0.68;
+    final lengthTop = Offset(lengthX, shirtPoint(0, 0.34).dy);
+    final lengthBottom = Offset(lengthX, shirtPoint(0, 0.9).dy);
     canvas.drawLine(
-      Offset(size.width * 0.74, size.height * 0.29),
-      Offset(size.width * 0.74, size.height * 0.85),
-      measure,
+        lengthTop.translate(0, 7), lengthBottom.translate(0, -7), measure);
+    _drawArrowHead(canvas, lengthTop, const Offset(0, -1));
+    _drawArrowHead(canvas, lengthBottom, const Offset(0, 1));
+    _drawDiagramLabel(
+      canvas,
+      'B',
+      Offset(lengthX + 13, (lengthTop.dy + lengthBottom.dy) / 2),
     );
-    _drawDiagramLabel(
-        canvas, 'A', Offset(size.width * 0.5, size.height * 0.51));
-    _drawDiagramLabel(
-        canvas, 'B', Offset(size.width * 0.79, size.height * 0.58));
+  }
+
+  void _drawArrowHead(Canvas canvas, Offset tip, Offset direction) {
+    final normal = Offset(-direction.dy, direction.dx);
+    final base = tip - direction * 7;
+    final path = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(base.dx + normal.dx * 3.5, base.dy + normal.dy * 3.5)
+      ..lineTo(base.dx - normal.dx * 3.5, base.dy - normal.dy * 3.5)
+      ..close();
+    canvas.drawPath(path, Paint()..color = _accent);
   }
 
   void _drawDiagramLabel(Canvas canvas, String label, Offset center) {
+    canvas.drawCircle(center, 9, Paint()..color = _accent);
     final painter = TextPainter(
       text: TextSpan(
         text: label,
         style: const TextStyle(
-          color: _accent,
-          fontSize: 13,
+          color: _background,
+          fontSize: 11,
           fontWeight: FontWeight.w900,
         ),
       ),
